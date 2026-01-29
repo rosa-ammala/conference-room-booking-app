@@ -6200,9 +6200,517 @@ Kun olet testannut, että poisto toimii päästä päähän (kalenteri + slotit)
 ---
 
 ### Kehote
-
+Voit siirtyä niihin. Kaikki toimii tähän asti.
 
 ### Vastaus
+Hyvä, nyt viilataan käytettävyyttä. Tehdään tästä yksi “UX-vaihe” missä:
+* varoitukset tulee ruudulle, ei vain konsoliin
+* lomake ei anna submitoida jos se on selvästi viallinen
+* virhetilanteista saa järkevän viestin
+
+#### Vaihe 10: Validointi + virheilmoitukset (GET / POST / DELETE)
+##### 10.1 Varauslomake: kenttävalidointi + virheilmoitukset
+Tehdään `ReservationFormComponent`ista oikea lomake:
+* kenttäkohtaiset virheilmoitukset `title` ja `host`
+* submit disabled, jos:
+  * kentät invalid
+  * slottia ei valittu
+  * tai pyyntö kesken
+* selkeä tekstiviesti, jos POST epäonnistuu
+
+###### 10.1.1 Päivitä TS
+📄 `web/src/app/booking/reservation-form.component.ts`
+Korvaa nykyinen sisältö tällä (tai miksaa, jos olet tehnyt omia lisäyksiä – tärkeät kohdat kommentoitu):
+```ts
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule, NgForm } from '@angular/forms';
+import { Subscription } from 'rxjs';
+import {
+  Reservation,
+  ReservationDurationMinutes,
+} from '../core/models/reservation.model';
+import { BookingStateService } from '../core/services/booking-state.service';
+import {
+  SlotInfo,
+  computeDaySlots,
+  filterReservationsForDate,
+} from '../core/utils/slot.util';
+import { environment } from '../../environments/environment';
+import { ReservationsApiService } from '../core/services/reservations-api.service';
+
+@Component({
+  selector: 'app-reservation-form',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  templateUrl: './reservation-form.component.html',
+  styleUrls: ['./reservation-form.component.scss'],
+})
+export class ReservationFormComponent implements OnInit, OnDestroy {
+  readonly durations: ReservationDurationMinutes[] = [30, 60, 120, 180];
+
+  selectedDuration: ReservationDurationMinutes = 60;
+  timeSlots: SlotInfo[] = [];
+  selectedStartIsoUtc: string | null = null;
+
+  title = '';
+  host = '';
+
+  /** Onko POST-pyyntö käynnissä */
+  isSubmitting = false;
+  /** Käyttäjälle näytettävä virheilmoitus varauksen luonnista */
+  submitError: string | null = null;
+
+  private subscription?: Subscription;
+
+  constructor(
+    private readonly bookingState: BookingStateService,
+    private readonly reservationsApi: ReservationsApiService
+  ) {}
+
+  ngOnInit(): void {
+    this.subscription = this.bookingState.state$.subscribe((state) => {
+      const roomId = state.selectedRoomId;
+      const dateKey = state.selectedDateKey;
+      const duration = state.selectedDurationMinutes;
+
+      this.selectedDuration = duration;
+      this.selectedStartIsoUtc = state.selectedStartIsoUtc;
+
+      const allReservationsForRoom = roomId
+        ? state.reservationsByRoomId[roomId] ?? []
+        : [];
+
+      const reservationsForDay = filterReservationsForDate(
+        allReservationsForRoom,
+        dateKey
+      );
+
+      this.timeSlots = computeDaySlots({
+        dateKey,
+        durationMinutes: duration,
+        workdayStartHour: environment.workdayStartHour,
+        workdayEndHour: environment.workdayEndHour,
+        reservations: reservationsForDay,
+      });
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.subscription?.unsubscribe();
+  }
+
+  onSelectDuration(duration: ReservationDurationMinutes): void {
+    this.bookingState.setSelectedDurationMinutes(duration);
+    // Mahdollinen aiempi slotti voi muuttua invalidiksi -> nollaus tehdään state-servicessä
+  }
+
+  onSelectStart(slot: SlotInfo): void {
+    if (slot.disabled) {
+      return;
+    }
+    this.bookingState.setSelectedStartIsoUtc(slot.startIsoUtc);
+    // Jos oli aiempi virhe “valitse aloitusaika”, tyhjennetään se
+    if (this.submitError) {
+      this.submitError = null;
+    }
+  }
+
+  onSubmit(form: NgForm): void {
+    const snapshot = this.bookingState.getSnapshot();
+    const roomId = snapshot.selectedRoomId;
+    const duration = snapshot.selectedDurationMinutes;
+    const startIsoUtc = snapshot.selectedStartIsoUtc;
+
+    // Perusvalidointi ennen API-kutsua
+    if (!roomId) {
+      this.submitError = 'Huonetta ei ole valittu.';
+      return;
+    }
+    if (!startIsoUtc) {
+      this.submitError = 'Valitse aloitusaika.';
+      return;
+    }
+    if (form.invalid) {
+      this.submitError = 'Täytä kaikki pakolliset kentät.';
+      return;
+    }
+
+    this.isSubmitting = true;
+    this.submitError = null;
+
+    const request = {
+      roomId,
+      durationMinutes: duration,
+      start: startIsoUtc,
+      title: this.title,
+      host: this.host,
+    };
+
+    this.reservationsApi.createReservation(request).subscribe({
+      next: (created: Reservation) => {
+        const current = this.bookingState.getSnapshot();
+        const existingForRoom =
+          current.reservationsByRoomId[roomId] ?? [];
+        const updatedForRoom = [...existingForRoom, created];
+
+        this.bookingState.setReservationsForRoom(
+          roomId,
+          updatedForRoom
+        );
+
+        this.bookingState.resetSelectionForNewReservation();
+
+        // Tyhjennetään lomakekentät
+        this.title = '';
+        this.host = '';
+        form.resetForm();
+
+        this.isSubmitting = false;
+        this.submitError = null;
+
+        console.log('Varaus luotu', created);
+      },
+      error: (error) => {
+        console.error('Varauksen luonti epäonnistui', error);
+        this.isSubmitting = false;
+
+        if (error?.status === 409) {
+          this.submitError =
+            'Varausta ei voitu luoda: valittu aika on jo varattu tai ei ole sallittu.';
+        } else {
+          this.submitError =
+            'Varauksen luonti epäonnistui. Yritä uudelleen.';
+        }
+      },
+    });
+  }
+}
+```
+###### 10.1.2 Päivitä lomakkeen HTML
+📄 `web/src/app/booking/reservation-form.component.html`
+Lisätään:
+* `#form="ngForm"`
+* kenttäkohtaiset virheilmoitukset
+* submit-nappi disabloidaan kun form invalid / ei slottia / submit kesken
+* yleinen virheilmoitus
+
+```html
+<form
+  class="reservation-form"
+  #form="ngForm"
+  (ngSubmit)="onSubmit(form)"
+>
+  <div class="reservation-form__group">
+    <label class="reservation-form__label">Kesto</label>
+    <div class="reservation-form__chips">
+      <button
+        *ngFor="let d of durations"
+        type="button"
+        class="reservation-form__chip"
+        [class.reservation-form__chip--active]="d === selectedDuration"
+        (click)="onSelectDuration(d)"
+      >
+        {{ d }} min
+      </button>
+    </div>
+  </div>
+
+  <div class="reservation-form__group">
+    <label class="reservation-form__label">Aloitusaika</label>
+    <div class="reservation-form__slots">
+      <button
+        *ngFor="let slot of timeSlots"
+        type="button"
+        class="reservation-form__slot"
+        [class.reservation-form__slot--active]="
+          slot.startIsoUtc === selectedStartIsoUtc
+        "
+        [class.reservation-form__slot--disabled]="slot.disabled"
+        (click)="onSelectStart(slot)"
+        [disabled]="slot.disabled"
+      >
+        {{ slot.label }}
+      </button>
+    </div>
+  </div>
+
+  <div class="reservation-form__group">
+    <label class="reservation-form__label" for="title">Kokouksen nimi</label>
+    <input
+      id="title"
+      type="text"
+      class="reservation-form__input"
+      [(ngModel)]="title"
+      name="title"
+      required
+      maxlength="100"
+      placeholder="Esim. Tiimipalaveri"
+      #titleModel="ngModel"
+    />
+    <div
+      class="reservation-form__field-error"
+      *ngIf="titleModel.invalid && titleModel.touched"
+    >
+      <span *ngIf="titleModel.errors?.['required']">
+        Kokouksen nimi on pakollinen.
+      </span>
+      <span *ngIf="titleModel.errors?.['maxlength']">
+        Nimi voi olla enintään 100 merkkiä.
+      </span>
+    </div>
+  </div>
+
+  <div class="reservation-form__group">
+    <label class="reservation-form__label" for="host">Järjestäjä</label>
+    <input
+      id="host"
+      type="text"
+      class="reservation-form__input"
+      [(ngModel)]="host"
+      name="host"
+      required
+      maxlength="100"
+      placeholder="Esim. Tiimi X"
+      #hostModel="ngModel"
+    />
+    <div
+      class="reservation-form__field-error"
+      *ngIf="hostModel.invalid && hostModel.touched"
+    >
+      <span *ngIf="hostModel.errors?.['required']">
+        Järjestäjä on pakollinen.
+      </span>
+      <span *ngIf="hostModel.errors?.['maxlength']">
+        Järjestäjän nimi voi olla enintään 100 merkkiä.
+      </span>
+    </div>
+  </div>
+
+  <div
+    class="reservation-form__error"
+    *ngIf="submitError"
+  >
+    {{ submitError }}
+  </div>
+
+  <div class="reservation-form__actions">
+    <button
+      type="submit"
+      class="reservation-form__submit"
+      [disabled]="
+        form.invalid || !selectedStartIsoUtc || isSubmitting
+      "
+    >
+      {{ isSubmitting ? 'Tallennetaan...' : 'Tallenna varaus' }}
+    </button>
+  </div>
+</form>
+```
+
+###### 10.1.3 Lisää tyylit virheilmoituksille
+📄 `web/src/app/booking/reservation-form.component.scss`
+Lisää:
+```scss
+.reservation-form__field-error {
+  font-size: 0.75rem;
+  color: #b91c1c;
+}
+
+.reservation-form__error {
+  font-size: 0.8rem;
+  color: #b91c1c;
+  margin-top: 0.25rem;
+}
+```
+
+(olemassa olevat tyylit voi pitää ennallaan).
+
+##### 10.2 Kuukausikalenterin delete-virheet näkyviin
+Lisätään yksinkertainen virheviesti, jos DELETE epäonnistuu.
+###### 10.2.1 Päivitä TS
+📄 `web/src/app/booking/month-calendar.component.ts`
+Lisää luokkaan property:
+```ts
+  /** Poistovirheen viesti */
+  deleteError: string | null = null;
+```
+
+Ja päivitä `onReservationClick`:
+
+```ts
+  onReservationClick(
+    day: MonthDayViewModel,
+    reservation: Reservation,
+    event: MouseEvent
+  ): void {
+    event.stopPropagation();
+
+    const snapshot = this.bookingState.getSnapshot();
+    const roomId = snapshot.selectedRoomId;
+    if (!roomId) {
+      return;
+    }
+
+    const message = `Poistetaanko varaus?\n${formatReservationSummary(
+      reservation
+    )}`;
+    const ok = window.confirm(message);
+    if (!ok) {
+      return;
+    }
+
+    this.reservationsApi.deleteReservation(roomId, reservation.id).subscribe({
+      next: () => {
+        this.bookingState.removeReservationFromRoom(
+          roomId,
+          reservation.id
+        );
+        this.deleteError = null;
+        console.log('Varaus poistettu', reservation.id);
+      },
+      error: (error) => {
+        console.error('Varauksen poisto epäonnistui', error);
+        this.deleteError =
+          'Varauksen poisto epäonnistui. Yritä uudelleen.';
+      },
+    });
+  }
+```
+
+###### 10.2.2 Lisää virheteksti HTML:ään
+📄 `web/src/app/booking/month-calendar.component.html`
+Lisää headerin alle:
+```html
+<div class="month-calendar">
+  <header class="month-calendar__header">
+    <button
+      type="button"
+      class="month-calendar__nav"
+      (click)="onPrevMonth()"
+    >
+      &larr;
+    </button>
+    <h3 class="month-calendar__title">{{ monthTitle }}</h3>
+    <button
+      type="button"
+      class="month-calendar__nav"
+      (click)="onNextMonth()"
+    >
+      &rarr;
+    </button>
+  </header>
+
+  <p
+    class="month-calendar__error"
+    *ngIf="deleteError"
+  >
+    {{ deleteError }}
+  </p>
+
+  <!-- weekdays + grid kuten aiemmin -->
+```
+
+Ja tyylit:
+📄 `web/src/app/booking/month-calendar.component.scss`
+```scss
+.month-calendar__error {
+  font-size: 0.8rem;
+  color: #b91c1c;
+}
+```
+
+##### 10.3 Varausten latausvirheet (GET) näkyviin
+Lisätään kevyt virheilmoitus, jos huoneen varausten haku epäonnistuu.
+###### 10.3.1 Päivitä BookingPageComponent TS
+📄 `web/src/app/booking/booking-page.component.ts`
+Lisää property:
+```ts
+  loadError: string | null = null;
+```
+
+Aseta se onnistumisessa/epäonnistumisessa:
+
+```ts
+  private loadReservationsForRoomIfNeeded(roomId: string): void {
+    if (this.loadedRoomIds.has(roomId)) {
+      return;
+    }
+
+    this.reservationsApi.getRoomReservations(roomId).subscribe({
+      next: (reservations) => {
+        this.bookingState.setReservationsForRoom(roomId, reservations);
+        this.loadedRoomIds.add(roomId);
+        this.loadError = null;
+      },
+      error: (error) => {
+        console.error(
+          'Virhe haettaessa varauksia huoneelle',
+          roomId,
+          error
+        );
+        this.loadError =
+          'Huoneen varausten lataaminen epäonnistui. Yritä päivittää sivu.';
+      },
+    });
+  }
+```
+
+###### 10.3.2 Lisää virheilmoitus BookingPage HTML:ään
+📄 `web/src/app/booking/booking-page.component.html`
+Lisää sivun alkuun:
+
+```html
+<div class="booking-page">
+  <div
+    class="booking-page__error"
+    *ngIf="loadError"
+  >
+    {{ loadError }}
+  </div>
+
+  <aside class="booking-page__sidebar">
+    <!-- muu sisältö -->
+```
+
+Ja tyyli:
+
+📄 `web/src/app/booking/booking-page.component.scss`
+
+```scss
+.booking-page__error {
+  grid-column: 1 / -1;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.85rem;
+}
+```
+
+#### 10.4 Välitestit
+Aja:
+```bash
+cd web
+npm run build
+npm start
+```
+
+Kokeile muutama juttu:
+1. Jätä `title` tai `host` tyhjäksi →
+   * kentän alle tulee virheilmoitus
+   * submit-nappi on disabloitu
+2. Yritä submit ilman slottia →
+   * lomakkeen päälle tulee teksti “Valitse aloitusaika.”
+3. Katkaise backend (tai manipuloi polku API:ssa) ja yritä:
+   * varauksen luonti → näet “Varauksen luonti epäonnistui. Yritä uudelleen.”
+   * varauksen poisto → näet “Varauksen poisto epäonnistui. Yritä uudelleen.”
+   * huoneen lataus → näet sivun ylälaidassa latausvirheviestin
+
+Jos nämä toimii ja UI tuntuu loogiselta, voidaan halutessasi vielä:
+* käydä koodia läpi refaktorointimielessä,
+* tai tehdä lyhyt “feature checklist” ja varmistaa että kaikkien esitehtävän vaatimusten ruksit on kunnossa.
 
 ---
 

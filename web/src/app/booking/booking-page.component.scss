@@ -35,3 +35,13 @@
 .booking-page__block--form {
   flex: 1;
 }
+
+.booking-page__error {
+  grid-column: 1 / -1;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.85rem;
+}

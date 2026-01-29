@@ -29,6 +29,8 @@ export class BookingPageComponent implements OnDestroy {
     { id: 'room-c', name: 'Room C' },
   ];
 
+  loadError: string | null = null;
+
   private subscription?: Subscription;
   /** Pidetään kirjaa huoneista, joille varaukset on jo ladattu. */
   private loadedRoomIds = new Set<string>();
@@ -64,17 +66,17 @@ export class BookingPageComponent implements OnDestroy {
   }
 
   private loadReservationsForRoomIfNeeded(roomId: string): void {
-    if (this.loadedRoomIds.has(roomId)) {
-      return;
-    }
+    if (this.loadedRoomIds.has(roomId)) return;
 
     this.reservationsApi.getRoomReservations(roomId).subscribe({
       next: (reservations) => {
         this.bookingState.setReservationsForRoom(roomId, reservations);
         this.loadedRoomIds.add(roomId);
+        this.loadError = null;
       },
       error: (error) => {
         console.error('Virhe haettaessa varauksia huoneelle', roomId, error);
+        this.loadError = 'Huoneen varausten lataaminen epäonnistui. Yritä päivittää sivu.';
       },
     });
   }

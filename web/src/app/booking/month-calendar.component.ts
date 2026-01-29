@@ -40,6 +40,9 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
   /** Teksti esim. "tammikuu 2026". */
   monthTitle = '';
 
+  /** Poistovirheen viesti */
+  deleteError: string | null = null;
+
   private currentMonthAnchorDateKey: UtcDateKey;
   private subscription?: Subscription;
 
@@ -108,24 +111,22 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
 
     const snapshot = this.bookingState.getSnapshot();
     const roomId = snapshot.selectedRoomId;
-    if (!roomId) {
-      return;
-    }
+    if (!roomId) return;
 
     const message = `Poistetaanko varaus?\n${formatReservationSummary(reservation)}`;
     const ok = window.confirm(message);
-    if (!ok) {
-      return;
-    }
+    if (!ok) return;
 
     this.reservationsApi.deleteReservation(roomId, reservation.id).subscribe({
       next: () => {
         // Poistetaan varaus frontin tilasta
         this.bookingState.removeReservationFromRoom(roomId, reservation.id);
+        this.deleteError = null;
         console.log('Varaus poistettu', reservation.id);
       },
       error: (error) => {
         console.error('Varauksen poisto epäonnistui', error);
+        this.deleteError = 'Varauksen poisto epäonnistui. Yritä uudelleen.';
       },
     });
   }

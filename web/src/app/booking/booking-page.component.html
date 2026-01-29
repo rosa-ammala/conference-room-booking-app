@@ -1,4 +1,11 @@
 <div class="booking-page">
+
+  @if (loadError) {
+    <div class="booking-page__error">
+      {{ loadError }}
+    </div>
+  }
+
   <section class="booking-page__left">
     <section class="booking-page__block booking-page__block--calendar">
       <h2 class="booking-page__block-title">Kuukausikalenteri</h2>

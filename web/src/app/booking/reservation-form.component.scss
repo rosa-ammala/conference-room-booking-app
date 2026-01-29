@@ -87,3 +87,14 @@
   color: #f9fafb;
   cursor: pointer;
 }
+
+.reservation-form__field-error {
+  font-size: 0.75rem;
+  color: #b91c1c;
+}
+
+.reservation-form__error {
+  font-size: 0.8rem;
+  color: #b91c1c;
+  margin-top: 0.25rem;
+}

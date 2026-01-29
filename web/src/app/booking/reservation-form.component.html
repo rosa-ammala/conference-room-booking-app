@@ -1,35 +1,41 @@
-<form class="reservation-form" (ngSubmit)="onSubmit()">
+<form 
+  class="reservation-form" 
+  #form="ngForm"
+  (ngSubmit)="onSubmit(form)"
+  >
   <div class="reservation-form__group">
     <label class="reservation-form__label">Kesto</label>
     <div class="reservation-form__chips">
-      <button
-        *ngFor="let d of durations"
-        type="button"
-        class="reservation-form__chip"
-        [class.reservation-form__chip--active]="d === selectedDuration"
-        (click)="onSelectDuration(d)"
-      >
-        {{ d }} min
-      </button>
+      @for (d of durations; track d) {
+        <button
+          type="button"
+          class="reservation-form__chip"
+          [class.reservation-form__chip--active]="d === selectedDuration"
+          (click)="onSelectDuration(d)"
+        >
+          {{ d }} min
+        </button>
+      }
     </div>
   </div>
 
   <div class="reservation-form__group">
     <label class="reservation-form__label">Aloitusaika</label>
     <div class="reservation-form__slots">
-      <button
-        *ngFor="let slot of timeSlots"
-        type="button"
-        class="reservation-form__slot"
-        [class.reservation-form__slot--active]="
-          slot.startIsoUtc === selectedStartIsoUtc
-        "
-        [class.reservation-form__slot--disabled]="slot.disabled"
-        (click)="onSelectStart(slot)"
-        [disabled]="slot.disabled"
-      >
-        {{ slot.label }}
-      </button>
+      @for (slot of timeSlots; track slot.startIsoUtc) {
+        <button
+          type="button"
+          class="reservation-form__slot"
+          [class.reservation-form__slot--active]="
+            slot.startIsoUtc === selectedStartIsoUtc
+          "
+          [class.reservation-form__slot--disabled]="slot.disabled"
+          (click)="onSelectStart(slot)"
+          [disabled]="slot.disabled"
+        >
+          {{ slot.label }}
+        </button>
+      }
     </div>
   </div>
 
@@ -44,7 +50,22 @@
       required
       maxlength="100"
       placeholder="Esim. Tiimipalaveri"
+      #titleModel="ngModel"
     />
+    @if (titleModel.invalid && titleModel.touched) {
+      <div class="reservation-form__field-error">
+        @if (titleModel.errors?.['required']) {
+          <span>
+            Kokouksen nimi on pakollinen.
+          </span>
+        }
+        @if (titleModel.errors?.['maxlength']) {
+          <span>
+            Nimi voi olla enintään 100 merkkiä.
+          </span>
+        }
+      </div>
+    }
   </div>
 
   <div class="reservation-form__group">
@@ -58,12 +79,37 @@
       required
       maxlength="100"
       placeholder="Esim. Tiimi X"
+      #hostModel="ngModel"
     />
+    @if (hostModel.invalid && hostModel.touched) {
+      <div class="reservation-form__field-error">
+        @if (hostModel.errors?.['required']) {
+          <span>
+            Järjestäjä on pakollinen.
+          </span>
+        }
+        @if (hostModel.errors?.['maxlength']) {
+          <span>
+            Järjestäjän nimi voi olla enintään 100 merkkiä.
+          </span>
+        }
+      </div>
+    }
   </div>
 
+  @if (submitError) {
+    <div class="reservation-form__error">
+      {{ submitError }}
+    </div>
+  }
+
   <div class="reservation-form__actions">
-    <button type="submit" class="reservation-form__submit">
-      Tallenna varaus
+    <button 
+      type="submit" 
+      class="reservation-form__submit"
+      [disabled]="form.invalid || !selectedStartIsoUtc || isSubmitting"
+    >
+      {{ isSubmitting ? 'Tallennetaan...' : 'Tallenna varaus' }}
     </button>
   </div>
 </form>

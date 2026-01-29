@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { Reservation, ReservationDurationMinutes } from '../core/models/reservation.model';
 import { BookingStateService } from '../core/services/booking-state.service';
@@ -28,6 +28,11 @@ export class ReservationFormComponent implements OnInit, OnDestroy {
 
   title = '';
   host = '';
+
+  /** Onko POST-pyyntö käynnissä */
+  isSubmitting = false;
+  /** Käyttäjälle näytettävä virheilmoitus varauksen luonnista */
+  submitError: string | null = null;
 
   private subscription?: Subscription;
 
@@ -73,22 +78,33 @@ export class ReservationFormComponent implements OnInit, OnDestroy {
   }
 
   onSelectStart(slot: SlotInfo): void {
-    if (slot.disabled) {
-      return;
-    }
+    if (slot.disabled) return;
+
     this.bookingState.setSelectedStartIsoUtc(slot.startIsoUtc);
+
+    if (this.submitError) this.submitError = null;
   }
 
-  onSubmit(): void {
+  onSubmit(form: NgForm): void {
     const snapshot = this.bookingState.getSnapshot();
     const roomId = snapshot.selectedRoomId;
     const duration = snapshot.selectedDurationMinutes;
     const startIsoUtc = snapshot.selectedStartIsoUtc;
 
-    if (!roomId || !startIsoUtc || !this.title || !this.host) {
-      console.warn('Varaus ei ole validi (puuttuu kenttiä), ei lähetetä.');
+    // Perusvalidointi ennen API-kutsua
+    if (!roomId) {
+      this.submitError = 'Valitse huone.';
+      return;
+    } else if (!startIsoUtc) {
+      this.submitError = 'Valitse aloitusaika.';
+      return;
+    } else if (form.invalid) {
+      this.submitError = 'Täytä puuttuvat kentät.';
       return;
     }
+
+    this.isSubmitting = true;
+    this.submitError = null;
 
     const request = {
       roomId,
@@ -102,8 +118,7 @@ export class ReservationFormComponent implements OnInit, OnDestroy {
       next: (created: Reservation) => {
         // Päivitetään huoneen varauslista lisäämällä uusi varaus
         const current = this.bookingState.getSnapshot();
-        const existingForRoom =
-          current.reservationsByRoomId[roomId] ?? [];
+        const existingForRoom = current.reservationsByRoomId[roomId] ?? [];
         const updatedForRoom = [...existingForRoom, created];
 
         this.bookingState.setReservationsForRoom(
@@ -117,12 +132,25 @@ export class ReservationFormComponent implements OnInit, OnDestroy {
         // Tyhjennetään kentät
         this.title = '';
         this.host = '';
+        form.resetForm();
+
+        this.isSubmitting = false;
+        this.submitError = null;
 
         console.log('Varaus luotu', created);
       },
       error: (error) => {
         // Tässä vaiheessa vain konsoli – myöhemmin näytetään käyttäjälle virhe
         console.error('Varauksen luonti epäonnistui', error);
+        this.isSubmitting = false;
+
+        if (error?.status === 409) {
+          this.submitError =
+            'Varausta ei voitu luoda: valittu aika ei ole käytettävissä.';
+        } else {
+          this.submitError =
+            'Varauksen luonti epäonnistui. Yritä hetken kuluttua uudelleen.';
+        }
       },
     });
   }
