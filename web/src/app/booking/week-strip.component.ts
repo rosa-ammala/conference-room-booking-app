@@ -15,7 +15,7 @@ interface WeekDayViewModel {
   labelShort: string;   // esim. "Ma"
   dayOfMonth: number;   // esim. 28
   isSelected: boolean;
-  isPast: boolean;
+  isWeekendOrPast: boolean;
 }
 
 @Component({
@@ -55,7 +55,7 @@ export class WeekStripComponent implements OnInit, OnDestroy {
   }
 
   onSelectDay(day: WeekDayViewModel): void {
-    if (day.isPast) {
+    if (day.isWeekendOrPast) {
       return;
     }
     this.bookingState.setSelectedDateKey(day.dateKey);
@@ -77,7 +77,9 @@ export class WeekStripComponent implements OnInit, OnDestroy {
       d.setDate(monday.getDate() + i);
 
       const dateKey = toDateKeyUtc(d);
-      const isPast = dateKey < todayKey; // string-vertailu toimii muodon vuoksi
+      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+      const isPast = dateKey < todayKey;
+      const isWeekendOrPast = isWeekend || isPast;
       const isSelected = dateKey === selectedDateKey;
 
       days.push({
@@ -85,7 +87,7 @@ export class WeekStripComponent implements OnInit, OnDestroy {
         labelShort: this.getWeekdayLabel(d.getDay()),
         dayOfMonth: d.getDate(),
         isSelected,
-        isPast,
+        isWeekendOrPast,
       });
     }
 

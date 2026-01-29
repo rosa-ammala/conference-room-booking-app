@@ -22,7 +22,7 @@ interface MonthDayViewModel {
   dayOfMonth: number;
   isCurrentMonth: boolean;
   isSelected: boolean;
-  isPast: boolean;
+  isWeekendOrPast: boolean;
   reservations: Reservation[];
 }
 
@@ -102,7 +102,7 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
   }
 
   onSelectDay(day: MonthDayViewModel): void {
-    if (day.isPast) {
+    if (day.isWeekendOrPast) {
       return;
     }
     this.bookingState.setSelectedDateKey(day.dateKey);
@@ -165,7 +165,9 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
 
       const dateKey = toDateKeyUtc(d);
       const isCurrentMonth = d.getMonth() === month;
+      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
       const isPast = dateKey < todayKey;
+      const isWeekendOrPast = isWeekend || isPast;
       const isSelected = dateKey === selectedDateKey;
 
       let reservationsForDay: Reservation[] = [];
@@ -181,7 +183,7 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
         dayOfMonth: d.getDate(),
         isCurrentMonth,
         isSelected,
-        isPast,
+        isWeekendOrPast,
         reservations: reservationsForDay,
       });
     }

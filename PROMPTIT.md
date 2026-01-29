@@ -7480,14 +7480,77 @@ Hyvä että huomasit tämän nyt – tämä on juuri niitä asioita, jotka erott
 ---
 
 ### Kehote
-
+Haluan muokata kuukausi ja viikko kalenteria niin, että viikonlopun la ja su napit ovat piilotettu kokonaan näkyvistä. Vaatiikoo se isoja muutoksia varsinkin kuukausi kalenterin rakentamiseen? Vastaa kyhyesti, ilman turhia selityksiä.
 
 ### Vastaus
+Lyhyesti: **ei vaadi isoja muutoksia.**
+* **Viikkonäkymä:** helppo → suodata `la` ja `su` pois datasta tai älä renderöi niitä templateen.
+* **Kuukausinäkymä:** vähän enemmän työtä, mutta silti maltillista →
+  * joko piilotat la/su **vain UI-tasolla** (CSS / ngIf), **tai**
+  * suodatat ne pois jo kalenterin rakennusvaiheessa (suositeltavampi, jos et halua “tyhjiä soluja”).
+
+👉 Yleensä tämä on **rakennelogikan hienosäätöä**, ei refaktorointi.
 
 ---
 
 ### Kehote
+Haluan lisätä suodatuksen, joka lisää la ja su päiville saman disapled tilan/css-class kuin menneillä päivillä on. 
+  private rebuildCalendar(
+    selectedDateKey: UtcDateKey,
+    selectedRoomId: string | null,
+    allReservationsForRoom: Reservation[]
+  ): void {
+    // Ankkuriksi currentMonthAnchorDateKey (huom: voi erota valitusta päivästä)
+    const anchorDate = fromDateKeyUtc(this.currentMonthAnchorDateKey);
+    const year = anchorDate.getFullYear();
+    const month = anchorDate.getMonth(); // 0-11
 
+    const firstOfMonth = new Date(year, month, 1, 0, 0, 0, 0);
+    const firstJsDay = firstOfMonth.getDay(); // 0=Su,...6=La
+    const diffToMonday = (firstJsDay + 6) % 7;  // Ma->0, Ti->1, Su->6
+
+    // Kalenterin ensimmäinen näkyvä päivä = kuukauden eka maanantai tai sitä edeltävä
+    const gridStart = new Date(firstOfMonth.getTime());
+    gridStart.setDate(firstOfMonth.getDate() - diffToMonday);
+
+    const todayKey = todayDateKeyUtc();
+
+    const days: MonthDayViewModel[] = [];
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(gridStart.getTime());
+      d.setDate(gridStart.getDate() + i);
+
+      const dateKey = toDateKeyUtc(d);
+      const isCurrentMonth = d.getMonth() === month;
+      const isPast = dateKey < todayKey;
+      const isSelected = dateKey === selectedDateKey;
+
+      let reservationsForDay: Reservation[] = [];
+      if (selectedRoomId) {
+        reservationsForDay = filterReservationsForDate(
+          allReservationsForRoom,
+          dateKey
+        );
+      }
+
+      days.push({
+        dateKey,
+        dayOfMonth: d.getDate(),
+        isCurrentMonth,
+        isSelected,
+        isPast,
+        reservations: reservationsForDay,
+      });
+    }
+
+    this.days = days;
+
+    console.log('Kalenteri rakennettu:', days);
+
+    // Kuukausiotsikko
+    const monthName = getMonthNameFi(firstOfMonth);
+    this.monthTitle = `${monthName} ${year}`;
+  }
 
 ### Vastaus
 

@@ -40,9 +40,9 @@
         class="month-calendar__day"
         [class.month-calendar__day--outside]="!day.isCurrentMonth"
         [class.month-calendar__day--selected]="day.isSelected"
-        [class.month-calendar__day--past]="day.isPast"
+        [class.month-calendar__day--past]="day.isWeekendOrPast"
         (click)="onSelectDay(day)"
-        [disabled]="day.isPast"
+        [disabled]="day.isWeekendOrPast"
       >
         <div class="month-calendar__day-number">
           {{ day.dayOfMonth }}
