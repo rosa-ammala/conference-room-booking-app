@@ -61,6 +61,7 @@ export class BookingStateService {
       ...current.reservationsByRoomId,
       [roomId]: reservations,
     };
+    console.log('Säädetään varaukset huoneelle', roomId, reservations);
 
     this.patchState({ reservationsByRoomId: updatedByRoom });
   }

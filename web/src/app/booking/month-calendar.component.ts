@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { BookingStateService } from '../core/services/booking-state.service';
@@ -48,7 +48,8 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly bookingState: BookingStateService,
-    private readonly reservationsApi: ReservationsApiService
+    private readonly reservationsApi: ReservationsApiService,
+    private readonly cdr: ChangeDetectorRef
   ) {
     // Ankkurikuukausi alussa = valitun päivän kuukausi
     this.currentMonthAnchorDateKey =
@@ -62,6 +63,7 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
         state.selectedRoomId,
         state.reservationsByRoomId[state.selectedRoomId ?? ''] ?? []
       );
+      this.cdr.markForCheck();
     });
   }
 
@@ -187,6 +189,8 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
     }
 
     this.days = days;
+
+    console.log('Kalenteri rakennettu:', days);
 
     // Kuukausiotsikko
     const titleDate = firstOfMonth;

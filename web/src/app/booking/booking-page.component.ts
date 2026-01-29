@@ -29,6 +29,8 @@ export class BookingPageComponent implements OnDestroy {
     { id: 'room-c', name: 'Room C' },
   ];
 
+  selectedRoomId: string | null = null;
+
   loadError: string | null = null;
 
   private subscription?: Subscription;
@@ -44,10 +46,12 @@ export class BookingPageComponent implements OnDestroy {
     if (defaultRoomId) {
       this.bookingState.setSelectedRoomId(defaultRoomId);
       this.loadReservationsForRoomIfNeeded(defaultRoomId);
+      this.selectedRoomId = defaultRoomId;
     }
 
     // Kuunnellaan huoneen vaihtumista ja haetaan varaukset uudelle huoneelle
     this.subscription = this.bookingState.state$.subscribe((state) => {
+      this.selectedRoomId = state.selectedRoomId;
       const roomId = state.selectedRoomId;
       if (roomId) {
         this.loadReservationsForRoomIfNeeded(roomId);

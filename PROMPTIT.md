@@ -6714,31 +6714,664 @@ Jos nämä toimii ja UI tuntuu loogiselta, voidaan halutessasi vielä:
 
 ---
 
-### Kehote
+##### Kehote
+Oletuksena room-a on aina valittuna, mutta se ei näy käyttäjälle asti UI:ssa. Miten korjaisit asian?
 
+##### Vastaus
+Hyvä bongaus – tämä johtuu siitä, että RoomSelector pitää omaa “sisäistä” valintaansa, eikä koskaan lue BookingStateServicen tilaa. Eli:
+* **BookingStateService** kyllä tietää, että `room-a` on valittu
+* mutta **RoomSelectorComponent** EI saa tätä tietoa, se näyttää aktiiviseksi vain ne, joita se itse on klikannut
 
-### Vastaus
+Korjaus: tehdään RoomSelectorista “controlled component”, joka:
+1. Saa valitun huoneen **Inputina**
+2. Emittoi valinnan **Outputina**
+3. Ei pidä omaa lokaalia “totuutta” valitusta huoneesta
+
+Alla konkreettiset muutokset.
+
+#### 1. BookingPageComponent: välitetään valittu huone lapselle
+Lisätään BookingPageen oma “presentaatio”-tila valitulle huoneelle ja sidotaan se BookingStateServiceen.
+📄 `booking-page.component.ts`
+```ts
+export class BookingPageComponent implements OnDestroy {
+  readonly rooms: Room[] = [
+    { id: 'room-a', name: 'Room A' },
+    { id: 'room-b', name: 'Room B' },
+    { id: 'room-c', name: 'Room C' },
+  ];
+
+  selectedRoomId: string | null = null;  // 👈 UI:lle välitettävä arvo
+
+  private subscription?: Subscription;
+  private loadedRoomIds = new Set<string>();
+
+  constructor(
+    private readonly bookingState: BookingStateService,
+    private readonly reservationsApi: ReservationsApiService
+  ) {
+    const defaultRoomId = this.rooms[0]?.id ?? null;
+    if (defaultRoomId) {
+      this.bookingState.setSelectedRoomId(defaultRoomId);
+      this.loadReservationsForRoomIfNeeded(defaultRoomId);
+      this.selectedRoomId = defaultRoomId;      // 👈 heti näkyväksi myös UI:ssa
+    }
+
+    this.subscription = this.bookingState.state$.subscribe((state) => {
+      this.selectedRoomId = state.selectedRoomId;   // 👈 sync frontin stateen
+      const roomId = state.selectedRoomId;
+      if (roomId) {
+        this.loadReservationsForRoomIfNeeded(roomId);
+      }
+    });
+  }
+
+  // ...
+
+  onRoomSelected(roomId: string): void {
+    this.bookingState.setSelectedRoomId(roomId);
+    this.loadReservationsForRoomIfNeeded(roomId);
+    // selectedRoomId päivittyy bookingState-subscriptionissa
+  }
+
+  // ...
+}
+```
+
+Ja templateen Input mukaan:
+📄 `booking-page.component.html`
+```html
+<app-room-selector
+  [rooms]="rooms"
+  [selectedRoomId]="selectedRoomId"
+  (roomSelected)="onRoomSelected($event)"
+></app-room-selector>
+```
+
+#### 2. RoomSelectorComponent: aktiivisuus Inputin perusteella
+RoomSelector ei enää pidä omaa `selectedRoomId`-statea, vaan saa sen parentilta.
+📄 `room-selector.component.ts`
+```ts
+@Component({
+  selector: 'app-room-selector',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './room-selector.component.html',
+  styleUrls: ['./room-selector.component.scss'],
+})
+export class RoomSelectorComponent {
+  @Input({ required: true }) rooms: Room[] = [];
+
+  @Input() selectedRoomId: string | null = null;   // 👈 parentilta tuleva valinta
+
+  @Output() roomSelected = new EventEmitter<string>();
+
+  onSelect(roomId: string): void {
+    this.roomSelected.emit(roomId);               // 👈 parent hoitaa state-päivityksen
+  }
+}
+```
+
+Ja template käyttää tätä Inputia:
+📄 `room-selector.component.html`
+```html
+<div class="room-selector">
+  <button
+    *ngFor="let room of rooms"
+    type="button"
+    class="room-selector__chip"
+    [class.room-selector__chip--active]="room.id === selectedRoomId"
+    (click)="onSelect(room.id)"
+  >
+    {{ room.name }}
+  </button>
+</div>
+```
+
+#### Lopputulos
+* Kun sivu latautuu:
+  * `BookingPage` asettaa BookingStateen `room-a`
+  * sama arvo kirjoitetaan `selectedRoomId`-propertyyn
+  * tämä välittyy `RoomSelectorComponentille` Inputina
+  * template tekee `room.id === selectedRoomId` → **Room A -chip on heti aktiivinen**
+* Kun käyttäjä vaihtaa huonetta:
+  * klik → `roomSelected` → `BookingPage.onRoomSelected`
+  * BookingPage päivittää BookingStateServicen
+  * subscription välittää uuden `selectedRoomId`in takaisin RoomSelectorille
+
+Eli komponentit pysyvät synkassa ja oletusvalinta näkyy UI:lle asti.
 
 ---
 
 ### Kehote
-
+On tärkeää, että kun sivu latautuu ensimmäistä kertaa myös kaikki huone varaukset näkyvät heti. Käyttäjän on klikattava jotakin ennen kuin ne näkyvät kalenterissa. Mihin komponenttiin lisään ngOnInitin -metodin tätä varten?
 
 ### Vastaus
+Lyhyt vastaus: **`BookingPageComponent`iin.**
+Pitkä vastaus: **nimenomaan `BookingPageComponent` on oikea paikka, eikä esim. MonthCalendar tai RoomSelector.**
+
+#### Miksi juuri `BookingPageComponent`?
+`BookingPageComponent` on tällä hetkellä:
+* **konteinerikomponentti**
+* ainoa paikka, joka:
+  * tietää huonelistasta
+  * hallitsee `BookingStateService`ä
+  * kutsuu `ReservationsApiService`ä
+  * orkestroi lapsikomponentteja (RoomSelector, MonthCalendar, WeekStrip, Form)
+
+👉 Eli se on **oikea “entry point” koko sivun initialisaatiolle**.
+Kalenteri- ja lomakekomponentit **eivät saa itse tehdä API-kutsuja**, vaan niiden pitää vain reagoida stateen.
+
+#### Ongelman juurisyy nykytilassa
+Tällä hetkellä varaukset haetaan vasta kun:
+* käyttäjä klikkaa huonetta **TAI**
+* `state$`-subscription reagoi `selectedRoomId`-muutokseen
+
+Mutta:
+* ensimmäisellä sivulatauksella
+* ennen kuin Angular ehtii ajaa subscription-logiikkaa kunnolla
+* kalenteri renderöityy tyhjällä `reservationsByRoomId`-datalla
+Siksi käyttäjän pitää klikata jotain ennen kuin varaukset “ilmestyvät”.
+
+#### Oikea ratkaisu
+##### ✔ Lisää `ngOnInit()` **BookingPageComponentiin**
+ja hae **kaikkien huoneiden varaukset heti** sivun latautuessa.
+Ei vain oletushuoneen.
+
+#### Konkreettinen korjaus
+##### `booking-page.component.ts`
+```ts
+import { Component, OnInit, OnDestroy } from '@angular/core';
+// ...
+
+export class BookingPageComponent implements OnInit, OnDestroy {
+  readonly rooms: Room[] = [
+    { id: 'room-a', name: 'Room A' },
+    { id: 'room-b', name: 'Room B' },
+    { id: 'room-c', name: 'Room C' },
+  ];
+
+  selectedRoomId: string | null = null;
+
+  private subscription?: Subscription;
+  private loadedRoomIds = new Set<string>();
+
+  constructor(
+    private readonly bookingState: BookingStateService,
+    private readonly reservationsApi: ReservationsApiService
+  ) {}
+
+  ngOnInit(): void {
+    // 1. Aseta oletushuone
+    const defaultRoomId = this.rooms[0]?.id ?? null;
+    if (defaultRoomId) {
+      this.bookingState.setSelectedRoomId(defaultRoomId);
+      this.selectedRoomId = defaultRoomId;
+    }
+
+    // 2. Lataa KAIKKIEN huoneiden varaukset heti
+    for (const room of this.rooms) {
+      this.loadReservationsForRoomIfNeeded(room.id);
+    }
+
+    // 3. Pidä UI synkassa staten kanssa
+    this.subscription = this.bookingState.state$.subscribe((state) => {
+      this.selectedRoomId = state.selectedRoomId;
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.subscription?.unsubscribe();
+  }
+
+  onRoomSelected(roomId: string): void {
+    this.bookingState.setSelectedRoomId(roomId);
+  }
+
+  private loadReservationsForRoomIfNeeded(roomId: string): void {
+    if (this.loadedRoomIds.has(roomId)) {
+      return;
+    }
+
+    this.reservationsApi.getRoomReservations(roomId).subscribe({
+      next: (reservations) => {
+        this.bookingState.setReservationsForRoom(roomId, reservations);
+        this.loadedRoomIds.add(roomId);
+      },
+      error: (error) => {
+        console.error('Huoneen varausten lataus epäonnistui', roomId, error);
+      },
+    });
+  }
+}
+```
+
+#### Mitä tämä korjaa?
+* ✅ Kun sivu avautuu:
+  * kaikki huoneiden varaukset haetaan heti
+  * `BookingStateService.reservationsByRoomId` täyttyy
+* ✅ MonthCalendar saa heti datan → näyttää varaukset ilman klikkailua
+* ✅ Slottilogiikka toimii heti oikein
+* ✅ Käyttäjä ei joudu “herättämään” UI:ta
+
+#### Miksi EI MonthCalendarComponentiin?
+Koska se olisi:
+* ❌ väärä vastuu (UI-komponentti tekisi data-fetchiä)
+* ❌ johtaisi tuplahakuun (kalenteri renderöityy useita kertoja)
+* ❌ rikkoisi erottelun:
+  * **container = data & orchestration**
+  * **presentational = renderöinti**
+
+### TL;DR
+👉 **Lisää `ngOnInit()` `BookingPageComponent`iin ja hae siellä kaikki huoneiden varaukset heti.**
+Se on arkkitehtonisesti oikein ja ratkaisee UX-ongelman siististi.
+Jos haluat, seuraavaksi voin:
+* refaktoroida tämän vielä RxJS-puhtaammaksi (forkJoin / combineLatest)
+* tai tehdä nopean “arkkitehtuurin yhteenveto” -checklistin ennen palautusta.
 
 ---
 
 ### Kehote
+Lisäsin ngOnInit:n, mutta se ei vielä tuo varauksia kalenteriin. Tutkin ongelmaa ja se on todennäköisesti MontCalendarComponentin ngOnInit:ssä, jossa kalenteri rakennetaan ennen kuin se saa tiedon huoneen varauksista. Jonka jälkeen vaikka varaukset ladataan oikein ja rebuildCalendar kutsutaan oikealla datalla, muutokset eivät näy UI:ssa asti. 
 
+MonthCalendarComponent:
+ngOnInit(): void {
+    this.subscription = this.bookingState.state$.subscribe((state) => {
+      console.log('MonthCalendarComponent: booking state changed', state);
+      if (!state.selectedRoomId) return;
+
+      console.log('Rebuilding month calendar view');
+      this.rebuildCalendar(
+        state.selectedDateKey,
+        state.selectedRoomId,
+        state.reservationsByRoomId[state.selectedRoomId ?? ''] ?? []
+      );
+    });
+  }
+
+BookingPageComponent:
+ngOnInit(): void {
+    // 1. Aseta oletushuone
+    const defaultRoomId = this.rooms[0]?.id ?? null;
+
+    if (defaultRoomId) {
+      this.selectedRoomId = defaultRoomId;
+      this.bookingState.setSelectedRoomId(defaultRoomId);
+
+      console.log('Ladataan oletushuoneen varaukset:', defaultRoomId);
+      
+      this.reservationsApi.getRoomReservations(defaultRoomId).subscribe({
+        next: (reservations) => {
+          this.bookingState.setReservationsForRoom(defaultRoomId, reservations);
+          this.loadedRoomIds.add(defaultRoomId);
+          this.loadError = null;
+        },
+        error: (error) => {
+          console.error('Virhe haettaessa varauksia huoneelle', defaultRoomId, error);
+          this.loadError = 'Huoneen varausten lataaminen epäonnistui. Yritä päivittää sivu.';
+        },
+      });
+    }
+
+    // 2. Lataa KAIKKIEN huoneiden varaukset heti
+    for (const room of this.rooms) {
+      if (room.id !== defaultRoomId) {
+        this.loadReservationsForRoomIfNeeded(room.id);
+      }
+    }
+
+    // 3. Pidä UI synkassa staten kanssa
+    this.subscription = this.bookingState.state$.subscribe((state) => {
+      this.selectedRoomId = state.selectedRoomId;
+    });
+  }
 
 ### Vastaus
+Hyvä debuggaus, ja kiitos että laitoit koodipalat näkyviin – tästä näkee aika hyvin missä homma “hämää”.
+
+Kaksi asiaa samaan aikaan:
+1. **ngOnInit pitää tosiaan olla BookingPageComponentissa** (hyvin teit jo). Se on se paikka, missä:
+   * valitaan oletushuone
+   * haetaan kaikille huoneille varaukset
+2. Nyt ongelma on käytännössä **MonthCalendarComponentin sisäisessä logiikassa**, ei enää ngOnInitin sijainnissa.
+
+Eli vastauksena suoraan kysymykseen:
+➡️ **ngOnInit kuuluu BookingPageComponentiin**, mutta korjaus siihen että varaukset varmasti näkyvät kalenterissa tehdään **MonthCalendarComponentin** sisällä.
+Alla konkreettinen, selkeyttävä fix MonthCalendarille, joka takaa että kun `state.reservationsByRoomId[...]` päivittyy, myös UI päivittyy.
+
+#### 1. Yksinkertaistetaan MonthCalendarComponentin logiikka
+Tehdään kalenterin uudelleenrakennus aina, kun BookingState muuttuu – riippuen vain:
+* `selectedDateKey`
+* `selectedRoomId`
+* `reservationsByRoomId[selectedRoomId]`
+
+Poistetaan siitä kaikki ylimääräinen “ankkuri”-taikailu, jotta ei jää mitään outoa tilaa väliin.
+##### 📄 Uusi versio `month-calendar.component.ts`
+```ts
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Subscription } from 'rxjs';
+import { BookingStateService } from '../core/services/booking-state.service';
+import { UtcDateKey } from '../core/models/booking-state.model';
+import {
+  fromDateKeyUtc,
+  getMonthNameFi,
+  toDateKeyUtc,
+  todayDateKeyUtc,
+  addMonthsToDateKey,
+} from '../core/utils/date-time.util';
+import {
+  filterReservationsForDate,
+  formatReservationSummary,
+} from '../core/utils/slot.util';
+import { Reservation } from '../core/models/reservation.model';
+import { ReservationsApiService } from '../core/services/reservations-api.service';
+
+interface MonthDayViewModel {
+  dateKey: UtcDateKey;
+  dayOfMonth: number;
+  isCurrentMonth: boolean;
+  isSelected: boolean;
+  isPast: boolean;
+  reservations: Reservation[];
+}
+
+@Component({
+  selector: 'app-month-calendar',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './month-calendar.component.html',
+  styleUrls: ['./month-calendar.component.scss'],
+})
+export class MonthCalendarComponent implements OnInit, OnDestroy {
+  days: MonthDayViewModel[] = [];
+  monthTitle = '';
+  deleteError: string | null = null;
+
+  /** Mikä kuukausi on näkyvissä – oletuksena valitun päivän kuukausi. */
+  private currentMonthAnchorDateKey: UtcDateKey;
+
+  private subscription?: Subscription;
+
+  constructor(
+    private readonly bookingState: BookingStateService,
+    private readonly reservationsApi: ReservationsApiService
+  ) {
+    this.currentMonthAnchorDateKey =
+      this.bookingState.getSnapshot().selectedDateKey;
+  }
+
+  ngOnInit(): void {
+    this.subscription = this.bookingState.state$.subscribe((state) => {
+      // Ei huonetta -> ei varauksia; silti voidaan näyttää kalenteri
+      const roomId = state.selectedRoomId;
+      const selectedDateKey = state.selectedDateKey;
+
+      const allReservationsForRoom =
+        roomId && state.reservationsByRoomId[roomId]
+          ? state.reservationsByRoomId[roomId]
+          : [];
+
+      this.rebuildCalendar(selectedDateKey, roomId, allReservationsForRoom);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.subscription?.unsubscribe();
+  }
+
+  onPrevMonth(): void {
+    this.currentMonthAnchorDateKey = addMonthsToDateKey(
+      this.currentMonthAnchorDateKey,
+      -1
+    );
+    const snapshot = this.bookingState.getSnapshot();
+    const roomId = snapshot.selectedRoomId;
+    const allReservationsForRoom =
+      roomId && snapshot.reservationsByRoomId[roomId]
+        ? snapshot.reservationsByRoomId[roomId]
+        : [];
+
+    this.rebuildCalendar(
+      snapshot.selectedDateKey,
+      roomId,
+      allReservationsForRoom
+    );
+  }
+
+  onNextMonth(): void {
+    this.currentMonthAnchorDateKey = addMonthsToDateKey(
+      this.currentMonthAnchorDateKey,
+      +1
+    );
+    const snapshot = this.bookingState.getSnapshot();
+    const roomId = snapshot.selectedRoomId;
+    const allReservationsForRoom =
+      roomId && snapshot.reservationsByRoomId[roomId]
+        ? snapshot.reservationsByRoomId[roomId]
+        : [];
+
+    this.rebuildCalendar(
+      snapshot.selectedDateKey,
+      roomId,
+      allReservationsForRoom
+    );
+  }
+
+  onSelectDay(day: MonthDayViewModel): void {
+    if (day.isPast) {
+      return;
+    }
+    this.bookingState.setSelectedDateKey(day.dateKey);
+    // Päivän vaihto -> ankkuroi myös kuukauden tähän päivään
+    this.currentMonthAnchorDateKey = day.dateKey;
+  }
+
+  onReservationClick(
+    day: MonthDayViewModel,
+    reservation: Reservation,
+    event: MouseEvent
+  ): void {
+    event.stopPropagation();
+
+    const snapshot = this.bookingState.getSnapshot();
+    const roomId = snapshot.selectedRoomId;
+    if (!roomId) {
+      return;
+    }
+
+    const message = `Poistetaanko varaus?\n${formatReservationSummary(
+      reservation
+    )}`;
+    const ok = window.confirm(message);
+    if (!ok) {
+      return;
+    }
+
+    this.reservationsApi.deleteReservation(roomId, reservation.id).subscribe({
+      next: () => {
+        this.bookingState.removeReservationFromRoom(
+          roomId,
+          reservation.id
+        );
+        this.deleteError = null;
+        console.log('Varaus poistettu', reservation.id);
+      },
+      error: (error) => {
+        console.error('Varauksen poisto epäonnistui', error);
+        this.deleteError =
+          'Varauksen poisto epäonnistui. Yritä uudelleen.';
+      },
+    });
+  }
+
+  getReservationSummary(reservation: Reservation): string {
+    return formatReservationSummary(reservation);
+  }
+
+  private rebuildCalendar(
+    selectedDateKey: UtcDateKey,
+    selectedRoomId: string | null,
+    allReservationsForRoom: Reservation[]
+  ): void {
+    const anchorDate = fromDateKeyUtc(this.currentMonthAnchorDateKey);
+    const year = anchorDate.getUTCFullYear();
+    const month = anchorDate.getUTCMonth(); // 0-11
+
+    const firstOfMonth = new Date(
+      Date.UTC(year, month, 1, 0, 0, 0, 0)
+    );
+    const firstJsDay = firstOfMonth.getUTCDay(); // 0=Su,...6=La
+    const diffToMonday = (firstJsDay + 6) % 7; // Ma->0, Ti->1, Su->6
+
+    const gridStart = new Date(firstOfMonth.getTime());
+    gridStart.setUTCDate(firstOfMonth.getUTCDate() - diffToMonday);
+
+    const todayKey = todayDateKeyUtc();
+
+    const days: MonthDayViewModel[] = [];
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(gridStart.getTime());
+      d.setUTCDate(gridStart.getUTCDate() + i);
+
+      const dateKey = toDateKeyUtc(d);
+      const isCurrentMonth = d.getUTCMonth() === month;
+      const isPast = dateKey < todayKey;
+      const isSelected = dateKey === selectedDateKey;
+
+      let reservationsForDay: Reservation[] = [];
+      if (selectedRoomId) {
+        reservationsForDay = filterReservationsForDate(
+          allReservationsForRoom,
+          dateKey
+        );
+      }
+
+      days.push({
+        dateKey,
+        dayOfMonth: d.getUTCDate(),
+        isCurrentMonth,
+        isSelected,
+        isPast,
+        reservations: reservationsForDay,
+      });
+    }
+
+    this.days = days;
+
+    const titleDate = firstOfMonth;
+    const monthName = getMonthNameFi(titleDate);
+    this.monthTitle = `${monthName} ${year}`;
+  }
+}
+```
+
+Tärkeät pointit:
+* `ngOnInit` ei enää early-returnaa jos `selectedRoomId` puuttuu, vaan rakentaa kalenterin joka tapauksessa (ilman varauksia).
+* Kun `setReservationsForRoom` päivittää tilan, `state$`-subscribe kutsuu `rebuildCalendar`ia uudestaan **uusi array** -> `this.days = days` → Angular näkee muutoksen ja päivittää UI:n.
+
+#### 2. Varmista että template käyttää `day.reservations`
+Varmistus vielä, ettei ole sekaisin vanhan `summaries`-logiikan kanssa.
+📄 `month-calendar.component.html` pitäisi näyttää käytännössä tältä:
+```html
+<div class="month-calendar">
+  <header class="month-calendar__header">
+    <button
+      type="button"
+      class="month-calendar__nav"
+      (click)="onPrevMonth()"
+    >
+      &larr;
+    </button>
+    <h3 class="month-calendar__title">{{ monthTitle }}</h3>
+    <button
+      type="button"
+      class="month-calendar__nav"
+      (click)="onNextMonth()"
+    >
+      &rarr;
+    </button>
+  </header>
+
+  <p
+    class="month-calendar__error"
+    *ngIf="deleteError"
+  >
+    {{ deleteError }}
+  </p>
+
+  <div class="month-calendar__weekdays">
+    <span>Ma</span>
+    <span>Ti</span>
+    <span>Ke</span>
+    <span>To</span>
+    <span>Pe</span>
+    <span>La</span>
+    <span>Su</span>
+  </div>
+
+  <div class="month-calendar__grid">
+    <button
+      *ngFor="let day of days"
+      type="button"
+      class="month-calendar__day"
+      [class.month-calendar__day--outside]="!day.isCurrentMonth"
+      [class.month-calendar__day--selected]="day.isSelected"
+      [class.month-calendar__day--past]="day.isPast"
+      (click)="onSelectDay(day)"
+      [disabled]="day.isPast"
+    >
+      <div class="month-calendar__day-number">
+        {{ day.dayOfMonth }}
+      </div>
+
+      <ul
+        class="month-calendar__summaries"
+        *ngIf="day.reservations.length > 0"
+      >
+        <li
+          *ngFor="let reservation of day.reservations"
+          class="month-calendar__summary-item"
+          (click)="onReservationClick(day, reservation, $event)"
+        >
+          {{ getReservationSummary(reservation) }}
+        </li>
+      </ul>
+    </button>
+  </div>
+</div>
+```
+
+Jos jossain vielä viitataan `day.summaries` tms., se ei tietenkään koskaan päivity.
+
+#### 3. Yhteenveto vastauksesta
+* **ngOnInit:n paikka tähän ongelmaan** on oikein: `BookingPageComponent` (kuten teit).
+* Jotta varaukset näkyvät heti kalenterissa ilman käyttäjän klikkailuja, kannattaa:
+  * hakea varaukset BookingPagessa ngOnInitissä (tehty)
+  * ja yksinkertaistaa MonthCalendarComponentin state-subscription niin, että se aina rakentaa `days`-arrayn uudestaan, kun BookingState päivittyy → `this.days = days` → UI päivittyy.
+
+Jos haluat, voit seuraavaksi heittää vielä pienen `console.log(this.days)` `rebuildCalendar`in loppuun ja katsoa devtoolsista, että päivillä tosiaan on `reservations`-taulukko – silloin tiedetään varmasti, että ongelma on enää pelkästään template-/change detection -tasolla.
 
 ---
 
 ### Kehote
+"ngOnInit(): void {
+    this.subscription = this.bookingState.state$.subscribe((state) => {
+      this.rebuildCalendar(
+        state.selectedDateKey,
+        state.selectedRoomId,
+        state.reservationsByRoomId[state.selectedRoomId ?? ''] ?? []
+      );
+      this.cdr.markForCheck();
+    });
+  }
+": Lisäsin this.cdr.markForCheck();, joka korjasi koko ongelman. Syynä oli, että Angular ei tarkistanut komponentin tilaa vaikka kalenteri rakennettiin uudestaan. Poistin muut muutokset mitä teimme ngOnInitteihin, koska ne eivät tuo tässä kohdassa lisäarvoa. 
 
+Odota seuraavaa ohjettani, älä vastaa tähän pitkästi.
 
 ### Vastaus
+👍 Selvä. Hyvä korjaus ja analyysi – **`ChangeDetectionStrategy.OnPush` + `markForCheck()`** on juuri se oikea ratkaisu tässä tilanteessa.
+
+Odotan seuraavaa ohjettasi.
 
 ---
 

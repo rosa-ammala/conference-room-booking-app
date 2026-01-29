@@ -18,6 +18,7 @@
       <h2 class="booking-page__block-title">Huone</h2>
       <app-room-selector
         [rooms]="rooms"
+        [selectedRoomId]="selectedRoomId"
         (roomSelected)="onRoomSelected($event)"
       ></app-room-selector>
     </section>

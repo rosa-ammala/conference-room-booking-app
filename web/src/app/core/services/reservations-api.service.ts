@@ -30,6 +30,7 @@ export class ReservationsApiService {
    */
   getRoomReservations(roomId: RoomId): Observable<Reservation[]> {
     const url = this.buildRoomReservationsUrl(roomId);
+    console.log('Haetaan varaukset palvelimelta:', url);
     return this.http.get<Reservation[]>(url);
   }
 

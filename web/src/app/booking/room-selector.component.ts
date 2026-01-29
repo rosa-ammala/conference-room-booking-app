@@ -12,12 +12,11 @@ import { Room } from '../core/models/room.model';
 export class RoomSelectorComponent {
   @Input({ required: true }) rooms: Room[] = [];
 
+  @Input() selectedRoomId: string | null = null;
+
   @Output() roomSelected = new EventEmitter<string>();
 
-  selectedRoomId: string | null = null;
-
   onSelect(roomId: string): void {
-    this.selectedRoomId = roomId;
     this.roomSelected.emit(roomId);
   }
 }
