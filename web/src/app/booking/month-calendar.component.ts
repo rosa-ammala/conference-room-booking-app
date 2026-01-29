@@ -145,28 +145,26 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
   ): void {
     // Ankkuriksi currentMonthAnchorDateKey (huom: voi erota valitusta päivästä)
     const anchorDate = fromDateKeyUtc(this.currentMonthAnchorDateKey);
-    const year = anchorDate.getUTCFullYear();
-    const month = anchorDate.getUTCMonth(); // 0-11
+    const year = anchorDate.getFullYear();
+    const month = anchorDate.getMonth(); // 0-11
 
-    const firstOfMonth = new Date(
-      Date.UTC(year, month, 1, 0, 0, 0, 0)
-    );
-    const firstJsDay = firstOfMonth.getUTCDay(); // 0=Su,...6=La
+    const firstOfMonth = new Date(year, month, 1, 0, 0, 0, 0);
+    const firstJsDay = firstOfMonth.getDay(); // 0=Su,...6=La
     const diffToMonday = (firstJsDay + 6) % 7;  // Ma->0, Ti->1, Su->6
 
     // Kalenterin ensimmäinen näkyvä päivä = kuukauden eka maanantai tai sitä edeltävä
     const gridStart = new Date(firstOfMonth.getTime());
-    gridStart.setUTCDate(firstOfMonth.getUTCDate() - diffToMonday);
+    gridStart.setDate(firstOfMonth.getDate() - diffToMonday);
 
     const todayKey = todayDateKeyUtc();
 
     const days: MonthDayViewModel[] = [];
     for (let i = 0; i < 42; i++) {
       const d = new Date(gridStart.getTime());
-      d.setUTCDate(gridStart.getUTCDate() + i);
+      d.setDate(gridStart.getDate() + i);
 
       const dateKey = toDateKeyUtc(d);
-      const isCurrentMonth = d.getUTCMonth() === month;
+      const isCurrentMonth = d.getMonth() === month;
       const isPast = dateKey < todayKey;
       const isSelected = dateKey === selectedDateKey;
 
@@ -180,7 +178,7 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
 
       days.push({
         dateKey,
-        dayOfMonth: d.getUTCDate(),
+        dayOfMonth: d.getDate(),
         isCurrentMonth,
         isSelected,
         isPast,
@@ -193,8 +191,7 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
     console.log('Kalenteri rakennettu:', days);
 
     // Kuukausiotsikko
-    const titleDate = firstOfMonth;
-    const monthName = getMonthNameFi(titleDate);
+    const monthName = getMonthNameFi(firstOfMonth);
     this.monthTitle = `${monthName} ${year}`;
   }
 }

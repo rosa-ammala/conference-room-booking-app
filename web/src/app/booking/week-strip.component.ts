@@ -65,16 +65,16 @@ export class WeekStripComponent implements OnInit, OnDestroy {
     const selectedDate = fromDateKeyUtc(selectedDateKey);
     const todayKey = todayDateKeyUtc();
 
-    // Haetaan viikon maanantai (UTC)
-    const jsDay = selectedDate.getUTCDay(); // 0=Su,1=Ma,...6=La
+    // Haetaan viikon maanantai (paikallinen aika)
+    const jsDay = selectedDate.getDay(); // 0=Su,1=Ma,...6=La
     const diffToMonday = (jsDay + 6) % 7;  // Ma ->0, Ti->1, Su->6
     const monday = new Date(selectedDate.getTime());
-    monday.setUTCDate(monday.getUTCDate() - diffToMonday);
+    monday.setDate(monday.getDate() - diffToMonday);
 
     const days: WeekDayViewModel[] = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday.getTime());
-      d.setUTCDate(monday.getUTCDate() + i);
+      d.setDate(monday.getDate() + i);
 
       const dateKey = toDateKeyUtc(d);
       const isPast = dateKey < todayKey; // string-vertailu toimii muodon vuoksi
@@ -82,8 +82,8 @@ export class WeekStripComponent implements OnInit, OnDestroy {
 
       days.push({
         dateKey,
-        labelShort: this.getWeekdayLabel(d.getUTCDay()),
-        dayOfMonth: d.getUTCDate(),
+        labelShort: this.getWeekdayLabel(d.getDay()),
+        dayOfMonth: d.getDate(),
         isSelected,
         isPast,
       });

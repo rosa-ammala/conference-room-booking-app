@@ -25,29 +25,7 @@ export interface SlotInfo {
   disabled: boolean;
 }
 
-/**
- * Suodattaa annetun varauslistan niin, että mukaan jää vain tietyä
- * UTC-kalenteripäivää koskevat varaukset.
- */
-export function filterReservationsForDate(
-  reservations: Reservation[],
-  dateKey: UtcDateKey
-): Reservation[] {
-  return reservations.filter((r) => {
-    const startDate = parseUtcIsoString(r.start);
-    const startKey = toDateKeyUtc(startDate);
-    return startKey === dateKey;
-  });
-}
-
-/**
- * Laskee työpäivän slotit (30 min step) annetulle päivälle ja kestolle.
- *
- * - Kaikki ajat tulkitaan UTC:nä.
- * - Slotit, jotka ylittäisivät työpäivän loppuajan tai ovat menneisyydessä
- *   tai osuvat päällekkäin olemassa olevan varauksen kanssa, merkitään
- *   `disabled: true`.
- */
+// Laskee työpäivän slotit (30 min step) annetulle päivälle ja kestolle.
 export function computeDaySlots(params: {
   dateKey: UtcDateKey;
   durationMinutes: ReservationDurationMinutes;
@@ -66,22 +44,20 @@ export function computeDaySlots(params: {
   const baseDate = fromDateKeyUtc(dateKey);
   const slots: SlotInfo[] = [];
 
-  const workdayStartMinutes = workdayStartHour * 60;
-  const workdayEndMinutes = workdayEndHour * 60;
-
   for (let hour = workdayStartHour; hour < workdayEndHour; hour++) {
     for (const minute of [0, 30]) {
       const startMinutes = hour * 60 + minute;
       const endMinutes = startMinutes + durationMinutes;
+      const endHour = Math.floor(endMinutes / 60);
 
       // Slotin täytyy mahtua työpäivän sisään
-      if (endMinutes > workdayEndMinutes) {
+      if (endHour > workdayEndHour || (endHour === workdayEndHour && endMinutes % 60 > 0)) {
         continue;
       }
 
-      const slotDate = new Date(baseDate.getTime());
-      slotDate.setUTCHours(hour, minute, 0, 0);
+      const slotDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), hour, minute, 0, 0);
 
+      // Konvertoi UTC:ksi backendille
       const startIsoUtc = toUtcIsoString(slotDate);
       const label = formatLabel(hour, minute);
 
@@ -126,6 +102,17 @@ function hasOverlapWithReservations(
     // Yksinkertainen intervallien päällekkäisyystarkistus:
     // [start, end) ja [resStart, resEnd) overlappaavat jos:
     return start < resEnd && end > resStart;
+  });
+}
+
+export function filterReservationsForDate(
+  reservations: Reservation[],
+  dateKey: UtcDateKey
+): Reservation[] {
+  return reservations.filter((r) => {
+    const startDate = parseUtcIsoString(r.start);
+    const startKey = toDateKeyUtc(startDate);
+    return startKey === dateKey;
   });
 }
 

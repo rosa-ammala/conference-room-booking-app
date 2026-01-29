@@ -7376,9 +7376,106 @@ Odotan seuraavaa ohjettasi.
 ---
 
 ### Kehote
-
+Annoin aikaisemmin harhaan johtavia ohjeita aikavyöhyke asiaan liittyen. README:ssä sanotaan, että ajan kuuluisi olla suomen ajassa. Myöhemmin kuitenkin selvennyksiä antaessani ohjasin käyttämään UTC -aikaa, ilman konversiota paikalliseen aikaan. Haluan korjata tämän. Mikä on suorin vaihtoehto sille, että ajat näytetään käyttäjän paikalliseen aikaan? Kannattaisiko meidän poistaa kokonaan UTC:n käyttö?
 
 ### Vastaus
+Hyvä että nostit tämän esiin nyt – tämä on **klassinen mutta tärkeä aikavyöhykekysymys**, ja sen voi korjata siististi ilman isoa refaktoria 👍
+
+Tiivistetty vastaus ensin:
+> **Älä poista UTC:tä. Suorin ja kestävin ratkaisu on:**
+> * **Backend tallentaa ja palauttaa ajat UTC:na**
+> * **Frontend konvertoi ja näyttää ajat käyttäjän paikallisessa ajassa (Suomi = Europe/Helsinki)**
+
+Alla perustelut ja konkreettinen malli teidän projektiin.
+
+#### 1. Miksi UTC:tä ei kannata poistaa
+
+Vaikka käyttäjät ovat “suomalaisia”, UTC:stä luopuminen aiheuttaa enemmän ongelmia kuin ratkaisee:
+##### ❌ Jos poistatte UTC:n kokonaan
+* Tallennatte esim. `"2026-01-26T10:00"` ilman aikavyöhykettä
+* **DST (kesä-/talviaika) rikkoo logiikan**
+* Backend ei enää tiedä, onko kyseessä +02 vai +03
+* Päällekkäisyysvertailut ja “mennyt vs tuleva” -tarkistukset muuttuvat epäluotettaviksi
+
+👉 UTC on **oikea sisäinen totuus**, vaikka käyttäjä ei sitä näe.
+
+#### 2. Suorin korjaus: “UTC sisällä, paikallinen ulkona”
+Tämä sopii täydellisesti siihen, mitä README jo *melkein* sanoo.
+##### Backend (EI muutoksia tai vain pieniä täsmennyksiä)
+* Odottaa ja palauttaa **ISO 8601 + Z**
+* Laskee päällekkäisyydet ja `end`-ajan UTC:ssa
+* Ei tiedä mitään Suomesta tai käyttäjän sijainnista
+
+✅ Tämä teillä on jo käytännössä oikein
+
+##### Frontend (tämä on varsinainen korjaus)
+###### A. Kun käyttäjä valitsee ajan (esim. 10:00)
+Se on **paikallista aikaa**.
+```ts
+// käyttäjä valitsee 2026-01-26 klo 10:00 (Suomen aika)
+const localDate = new Date(2026, 0, 26, 10, 0);
+
+// Lähetetään backendille UTC-muodossa
+const isoUtc = localDate.toISOString();
+// → "2026-01-26T08:00:00.000Z" (talviaika)
+```
+
+👉 Backend saa aina UTC:n, kuten se haluaa.
+
+###### B. Kun backend palauttaa varauksia
+```json
+{
+  "start": "2026-01-26T08:00:00Z",
+  "end": "2026-01-26T09:00:00Z"
+}
+```
+
+Frontendissä:
+```ts
+const start = new Date(reservation.start);
+
+// Näytetään käyttäjälle
+start.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
+// → "10.00"
+```
+
+👉 Käyttäjä **näkee aina Suomen ajan**, myös kesäaikasiirtymien yli oikein.
+
+#### 3. Entä README ja dokumentaatio?
+
+Tässä kohtaa kannattaa tehdä **yksi selkeä linjaus**.
+##### Suositeltu muotoilu README:hen
+> * Backend käsittelee ajat aina UTC:ssa (ISO 8601, `Z`)
+> * Frontend vastaa:
+>   * käyttäjän syöttämien aikojen tulkinnasta paikallisena aikana
+>   * aikojen konvertoinnista UTC:ksi API-kutsuja varten
+>   * aikojen näyttämisestä käyttäjän paikallisessa ajassa (Suomi)
+
+Tämä:
+* on **ammattimainen**
+* vastaa oikeaa tuotantomaailmaa
+* poistaa ristiriidan aiemmista ohjeista
+
+#### 4. Jos haluatte mennä vielä suoraviivaisemmin (mutta vähemmän yleispätevästi)
+**Vaihtoehto B (vain jos tiedätte että käyttäjiä on aina Suomessa):**
+* Frontend käsittelee kaikki ajat `Europe/Helsinki`
+* Käyttää esim. `date-fns-tz` tai `Intl.DateTimeFormat`
+* Silti: **lähettää UTC:tä backendille**
+
+Eli silloinkin:
+👉 **UTC pysyy rajapinnan totuutena**
+
+#### 5. Lopullinen suositus teidän projektiin
+✔️ **Älkää poistako UTC:tä**
+✔️ Korjatkaa README sanomaan tämä eksplisiittisesti
+✔️ Tehkää frontendistä vastuullinen aikavyöhykekäännöksistä
+
+Jos haluat, seuraavaksi voin:
+* kirjoittaa **täsmällisen README-päivitystekstin**
+* katsoa **Angularissa parhaat paikat tehdä konversiot**
+* tai tarkistaa, ettei päällekkäisyyslogiikkaan jää aikavyöhykeansoja
+
+Hyvä että huomasit tämän nyt – tämä on juuri niitä asioita, jotka erottaa “toimii” vs “oikein tehty” -toteutuksen 💡
 
 ---
 
