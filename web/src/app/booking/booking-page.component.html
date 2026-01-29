@@ -1,0 +1,28 @@
+<div class="booking-page">
+  <aside class="booking-page__sidebar">
+    <section class="booking-page__block">
+      <h2 class="booking-page__block-title">Huone</h2>
+      <app-room-selector
+        [rooms]="rooms"
+        (roomSelected)="onRoomSelected($event)"
+      ></app-room-selector>
+    </section>
+
+    <section class="booking-page__block booking-page__block--calendar">
+      <h2 class="booking-page__block-title">Kuukausikalenteri</h2>
+      <app-month-calendar></app-month-calendar>
+    </section>
+  </aside>
+
+  <section class="booking-page__main">
+    <section class="booking-page__block">
+      <h2 class="booking-page__block-title">Viikko</h2>
+      <app-week-strip></app-week-strip>
+    </section>
+
+    <section class="booking-page__block booking-page__block--form">
+      <h2 class="booking-page__block-title">Uusi varaus</h2>
+      <app-reservation-form></app-reservation-form>
+    </section>
+  </section>
+</div>

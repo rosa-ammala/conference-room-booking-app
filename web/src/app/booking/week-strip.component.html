@@ -1,0 +1,24 @@
+<div class="week-strip">
+  <button type="button" class="week-strip__nav" (click)="onPrevWeek()">
+    &larr;
+  </button>
+
+  <div class="week-strip__days">
+    <button
+      *ngFor="let day of days"
+      type="button"
+      class="week-strip__day"
+      [class.week-strip__day--active]="day.isSelected"
+      [class.week-strip__day--disabled]="day.isPast"
+      (click)="onSelectDay(day)"
+      [disabled]="day.isPast"
+    >
+      {{ day.labelShort }}
+      <span class="week-strip__day-date">{{ day.dayOfMonth }}</span>
+    </button>
+  </div>
+
+  <button type="button" class="week-strip__nav" (click)="onNextWeek()">
+    &rarr;
+  </button>
+</div>

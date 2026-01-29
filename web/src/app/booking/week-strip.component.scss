@@ -1,0 +1,49 @@
+.week-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.week-strip__nav {
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  padding: 0.25rem 0.7rem;
+  cursor: pointer;
+}
+
+.week-strip__days {
+  display: flex;
+  flex: 1;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.week-strip__day {
+  flex: 1;
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  cursor: pointer;
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.week-strip__day-date {
+  font-weight: 600;
+}
+
+.week-strip__day--active {
+  background: #0f172a;
+  color: #f9fafb;
+  border-color: #0f172a;
+}
+
+.week-strip__day--disabled {
+  opacity: 0.5;
+  cursor: default;
+}

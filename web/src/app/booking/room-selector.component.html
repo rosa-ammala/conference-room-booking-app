@@ -1,0 +1,11 @@
+<div class="room-selector">
+  <button
+    *ngFor="let room of rooms"
+    type="button"
+    class="room-selector__chip"
+    [class.room-selector__chip--active]="room.id === selectedRoomId"
+    (click)="onSelect(room.id)"
+  >
+    {{ room.name }}
+  </button>
+</div>

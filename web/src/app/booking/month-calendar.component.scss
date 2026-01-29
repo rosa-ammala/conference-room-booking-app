@@ -1,0 +1,90 @@
+.month-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.month-calendar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.month-calendar__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.month-calendar__nav {
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  padding: 0.25rem 0.7rem;
+  cursor: pointer;
+}
+
+.month-calendar__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  font-size: 0.75rem;
+  text-align: center;
+  color: #94a3b8;
+}
+
+.month-calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+}
+
+.month-calendar__day {
+  position: relative;
+  border-radius: 0.5rem;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 0.3rem 0.25rem;
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+  min-height: 3.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.month-calendar__day-number {
+  font-weight: 600;
+  margin-bottom: 0.1rem;
+}
+
+.month-calendar__day--outside {
+  opacity: 0.4;
+}
+
+.month-calendar__day--selected {
+  border-color: #0f172a;
+  box-shadow: 0 0 0 1px #0f172a;
+}
+
+.month-calendar__day--past {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.month-calendar__summaries {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.65rem;
+  line-height: 1.2;
+}
+
+.month-calendar__summary-item {
+  cursor: pointer;
+}
+
+.month-calendar__summary-item:hover {
+  text-decoration: underline;
+}

@@ -1,0 +1,60 @@
+<div class="month-calendar">
+  <header class="month-calendar__header">
+    <button
+      type="button"
+      class="month-calendar__nav"
+      (click)="onPrevMonth()"
+    >
+      &larr;
+    </button>
+    <h3 class="month-calendar__title">{{ monthTitle }}</h3>
+    <button
+      type="button"
+      class="month-calendar__nav"
+      (click)="onNextMonth()"
+    >
+      &rarr;
+    </button>
+  </header>
+
+  <div class="month-calendar__weekdays">
+    <span>Ma</span>
+    <span>Ti</span>
+    <span>Ke</span>
+    <span>To</span>
+    <span>Pe</span>
+    <span>La</span>
+    <span>Su</span>
+  </div>
+
+  <div class="month-calendar__grid">
+    <button
+      *ngFor="let day of days"
+      type="button"
+      class="month-calendar__day"
+      [class.month-calendar__day--outside]="!day.isCurrentMonth"
+      [class.month-calendar__day--selected]="day.isSelected"
+      [class.month-calendar__day--past]="day.isPast"
+      (click)="onSelectDay(day)"
+      [disabled]="day.isPast"
+    >
+      <div class="month-calendar__day-number">
+        {{ day.dayOfMonth }}
+      </div>
+
+      <ul
+        class="month-calendar__summaries"
+        *ngIf="day.reservations.length > 0"
+      >
+        <li
+          *ngFor="let reservation of day.reservations"
+          class="month-calendar__summary-item"
+          (click)="onReservationClick(day, reservation, $event)"
+        >
+          {{ getReservationSummary(reservation) }}
+        </li>
+      </ul>
+    </button>
+  </div>
+
+</div>
