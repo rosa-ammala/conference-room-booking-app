@@ -9,12 +9,6 @@ import {
 } from '../models/reservation.model';
 import { environment } from '../../../environments/environment';
 
-/**
- * Vastaa varaus-API:n kutsuista.
- *
- * - Ei sisällä UI-logiikkaa (ei snackbareja, ei dialogeja).
- * - Palauttaa tyypitetyt Observablit, joita komponentit voivat käyttää.
- */
 @Injectable({
   providedIn: 'root',
 })
@@ -23,26 +17,14 @@ export class ReservationsApiService {
 
   constructor(private readonly http: HttpClient) {}
 
-  /**
-   * Palauttaa kaikki annetun huoneen varaukset.
-   *
-   * GET /rooms/:roomId/reservations
-   */
+  // Palauttaa kaikki annetun huoneen varaukset.
   getRoomReservations(roomId: RoomId): Observable<Reservation[]> {
     const url = this.buildRoomReservationsUrl(roomId);
     console.log('Haetaan varaukset palvelimelta:', url);
     return this.http.get<Reservation[]>(url);
   }
 
-  /**
-   * Luo uuden varauksen annetulle huoneelle.
-   *
-   * POST /rooms/:roomId/reservations
-   *
-   * Huom:
-   * - roomId tulee URL-parametrista.
-   * - Backend laskee end-ajan.
-   */
+  // Luo uuden varauksen annetulle huoneelle.
   createReservation(
     request: CreateReservationRequest
   ): Observable<Reservation> {
@@ -59,11 +41,7 @@ export class ReservationsApiService {
     return this.http.post<Reservation>(url, body);
   }
 
-  /**
-   * Poistaa olemassa olevan varauksen.
-   *
-   * DELETE /rooms/:roomId/reservations/:reservationId
-   */
+  // Poistaa olemassa olevan varauksen.
   deleteReservation(
     roomId: RoomId,
     reservationId: ReservationId
@@ -74,11 +52,7 @@ export class ReservationsApiService {
     return this.http.delete<void>(url);
   }
 
-  /**
-   * Rakentaa huoneen varaus-endpointin URL:n.
-   *
-   * Esim: http://localhost:3000/rooms/room-a/reservations
-   */
+  // Rakentaa huoneen varaus-endpointin URL:n.
   private buildRoomReservationsUrl(roomId: RoomId): string {
     return `${this.apiBaseUrl}/rooms/${encodeURIComponent(roomId)}/reservations`;
   }

@@ -30,11 +30,9 @@ export class BookingPageComponent implements OnDestroy {
   ];
 
   selectedRoomId: string | null = null;
-
   loadError: string | null = null;
 
   private subscription?: Subscription;
-  /** Pidetään kirjaa huoneista, joille varaukset on jo ladattu. */
   private loadedRoomIds = new Set<string>();
 
   constructor(

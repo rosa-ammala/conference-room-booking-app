@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { BookingStateService } from '../core/services/booking-state.service';
-import { UtcDateKey } from '../core/models/booking-state.model';
+import { DateKey } from '../core/models/booking-state.model';
 import {
   fromDateKeyUtc,
   toDateKeyUtc,
@@ -11,9 +11,9 @@ import {
 } from '../core/utils/date-time.util';
 
 interface WeekDayViewModel {
-  dateKey: UtcDateKey;
-  labelShort: string;   // esim. "Ma"
-  dayOfMonth: number;   // esim. 28
+  dateKey: DateKey;
+  labelShort: string;
+  dayOfMonth: number;
   isSelected: boolean;
   isWeekendOrPast: boolean;
 }
@@ -61,12 +61,12 @@ export class WeekStripComponent implements OnInit, OnDestroy {
     this.bookingState.setSelectedDateKey(day.dateKey);
   }
 
-  private buildWeek(selectedDateKey: UtcDateKey): void {
+  private buildWeek(selectedDateKey: DateKey): void {
     const selectedDate = fromDateKeyUtc(selectedDateKey);
     const todayKey = todayDateKeyUtc();
 
     // Haetaan viikon maanantai (paikallinen aika)
-    const jsDay = selectedDate.getDay(); // 0=Su,1=Ma,...6=La
+    const jsDay = selectedDate.getDay();
     const diffToMonday = (jsDay + 6) % 7;  // Ma ->0, Ti->1, Su->6
     const monday = new Date(selectedDate.getTime());
     monday.setDate(monday.getDate() - diffToMonday);

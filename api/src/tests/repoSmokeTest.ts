@@ -1,5 +1,5 @@
-import { InMemoryReservationRepository } from "./repositories/inMemoryReservationRepository.js";
-import type { RoomId } from "./domain/room.js";
+import { InMemoryReservationRepository } from "../repositories/inMemoryReservationRepository.js";
+import type { RoomId } from "../domain/room.js";
 
 const run = async () => {
   const repo = new InMemoryReservationRepository();

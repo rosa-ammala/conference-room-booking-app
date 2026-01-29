@@ -29,9 +29,7 @@ export class ReservationFormComponent implements OnInit, OnDestroy {
   title = '';
   host = '';
 
-  /** Onko POST-pyyntö käynnissä */
   isSubmitting = false;
-  /** Käyttäjälle näytettävä virheilmoitus varauksen luonnista */
   submitError: string | null = null;
 
   private subscription?: Subscription;
@@ -128,12 +126,9 @@ export class ReservationFormComponent implements OnInit, OnDestroy {
 
         // Resetoi uusi-varaus -valinnat (mutta pidä huone ja päivä)
         this.bookingState.resetSelectionForNewReservation();
-
-        // Tyhjennetään kentät
         this.title = '';
         this.host = '';
         form.resetForm();
-
         this.isSubmitting = false;
         this.submitError = null;
 

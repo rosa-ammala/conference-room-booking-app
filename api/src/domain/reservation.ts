@@ -9,11 +9,8 @@ export interface Reservation {
   id: ReservationId;
   roomId: RoomId;
   durationMinutes: DurationMinutes;
-
-  // Sisäisesti käsitellään Date-olioina (UTC-hetkinä)
   start: Date;
   end: Date;
-  
   title: string;
   host: string;
 }

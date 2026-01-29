@@ -2,7 +2,7 @@ import {
   Reservation,
   ReservationDurationMinutes,
 } from '../models/reservation.model';
-import { UtcDateKey } from '../models/booking-state.model';
+import { DateKey } from '../models/booking-state.model';
 import {
   fromDateKeyUtc,
   toUtcIsoString,
@@ -13,24 +13,19 @@ import {
 } from './date-time.util';
 
 export interface SlotInfo {
-  /** Näytettävä label esim. "10:00" */
   label: string;
-  /** Slotin aloitusaika ISO 8601 UTC -muodossa */
   startIsoUtc: string;
-  /** Onko slotti menneisyydessä nykyhetkeen nähden (UTC) */
   isPast: boolean;
-  /** Onko slotilla päällekkäisyyttä olemassa olevien varausten kanssa */
   hasConflict: boolean;
-  /** Käytetäänkö slotti disablettuna UI:ssa (isPast || hasConflict) */
   disabled: boolean;
 }
 
 // Laskee työpäivän slotit (30 min step) annetulle päivälle ja kestolle.
 export function computeDaySlots(params: {
-  dateKey: UtcDateKey;
+  dateKey: DateKey;
   durationMinutes: ReservationDurationMinutes;
-  workdayStartHour: number; // esim. 8
-  workdayEndHour: number;   // esim. 17
+  workdayStartHour: number;
+  workdayEndHour: number;
   reservations: Reservation[];
 }): SlotInfo[] {
   const {
@@ -107,7 +102,7 @@ function hasOverlapWithReservations(
 
 export function filterReservationsForDate(
   reservations: Reservation[],
-  dateKey: UtcDateKey
+  dateKey: DateKey
 ): Reservation[] {
   return reservations.filter((r) => {
     const startDate = parseUtcIsoString(r.start);
@@ -116,12 +111,8 @@ export function filterReservationsForDate(
   });
 }
 
-/**
- * Muodostaa käyttäjälle näytettävän lyhyen tekstin yhdelle varaukselle,
- * muotoa:
- *
- * "10:00-11:30 Tiimipalaveri, Tiimi X"
- */
+// Muodostaa käyttäjälle näytettävän lyhyen tekstin yhdelle varaukselle, 
+// muotoa: "10:00-11:30 Tiimipalaveri, Tiimi X"
 export function formatReservationSummary(reservation: Reservation): string {
   const startLabel = formatTimeFromUtcIso(reservation.start);
   const endLabel = formatTimeFromUtcIso(reservation.end);

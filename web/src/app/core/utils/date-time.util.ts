@@ -71,7 +71,7 @@ export function addDaysToDateKey(dateKey: string, days: number): string {
 export function addMonthsToDateKey(dateKey: string, months: number): string {
   const date = fromDateKeyUtc(dateKey);
   const year = date.getFullYear();
-  const month = date.getMonth(); // 0-11
+  const month = date.getMonth();
   const day = date.getDate();
 
   const targetMonthIndex = month + months;
@@ -90,13 +90,12 @@ export function addMonthsToDateKey(dateKey: string, months: number): string {
 
 function daysInMonth(date: Date): number {
   const year = date.getFullYear();
-  const month = date.getMonth(); // 0-11
-  // Kuukauden viimeinen päivä = seuraavan kuukauden 0. päivä
-  const lastDay = new Date(year, month + 1, 0, 0, 0, 0, 0);
+  const month = date.getMonth();
+  const lastDay = new Date(year, month + 1, 0, 0, 0, 0, 0); // Kuukauden viimeinen päivä = seuraavan kuukauden 0. päivä
   return lastDay.getDate();
 }
 
-// Palauttaa kuukauden nimen suomeksi (esim. "tammikuu").
+// Palauttaa kuukauden nimen suomeksi.
 export function getMonthNameFi(date: Date): string {
   const names = [
     'tammikuu',

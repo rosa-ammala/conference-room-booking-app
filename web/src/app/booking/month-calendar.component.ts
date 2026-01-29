@@ -2,7 +2,7 @@ import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { BookingStateService } from '../core/services/booking-state.service';
-import { UtcDateKey } from '../core/models/booking-state.model';
+import { DateKey } from '../core/models/booking-state.model';
 import {
   addMonthsToDateKey,
   fromDateKeyUtc,
@@ -18,7 +18,7 @@ import { Reservation } from '../core/models/reservation.model';
 import { ReservationsApiService } from '../core/services/reservations-api.service';
 
 interface MonthDayViewModel {
-  dateKey: UtcDateKey;
+  dateKey: DateKey;
   dayOfMonth: number;
   isCurrentMonth: boolean;
   isSelected: boolean;
@@ -34,16 +34,12 @@ interface MonthDayViewModel {
   styleUrls: ['./month-calendar.component.scss'],
 })
 export class MonthCalendarComponent implements OnInit, OnDestroy {
-  /** Päiväavaimet ruudussa (sis. edellisen/ seuraavan kuun päivät). */
   days: MonthDayViewModel[] = [];
-
-  /** Teksti esim. "tammikuu 2026". */
   monthTitle = '';
 
-  /** Poistovirheen viesti */
   deleteError: string | null = null;
 
-  private currentMonthAnchorDateKey: UtcDateKey;
+  private currentMonthAnchorDateKey: DateKey;
   private subscription?: Subscription;
 
   constructor(
@@ -137,20 +133,19 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
     return formatReservationSummary(reservation);
   }
 
-
   private rebuildCalendar(
-    selectedDateKey: UtcDateKey,
+    selectedDateKey: DateKey,
     selectedRoomId: string | null,
     allReservationsForRoom: Reservation[]
   ): void {
     // Ankkuriksi currentMonthAnchorDateKey (huom: voi erota valitusta päivästä)
     const anchorDate = fromDateKeyUtc(this.currentMonthAnchorDateKey);
     const year = anchorDate.getFullYear();
-    const month = anchorDate.getMonth(); // 0-11
+    const month = anchorDate.getMonth();
 
     const firstOfMonth = new Date(year, month, 1, 0, 0, 0, 0);
     const firstJsDay = firstOfMonth.getDay(); // 0=Su,...6=La
-    const diffToMonday = (firstJsDay + 6) % 7;  // Ma->0, Ti->1, Su->6
+    const diffToMonday = (firstJsDay + 6) % 7;
 
     // Kalenterin ensimmäinen näkyvä päivä = kuukauden eka maanantai tai sitä edeltävä
     const gridStart = new Date(firstOfMonth.getTime());
@@ -187,7 +182,6 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
         reservations: reservationsForDay,
       });
     }
-
     this.days = days;
 
     console.log('Kalenteri rakennettu:', days);

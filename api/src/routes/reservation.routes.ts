@@ -19,9 +19,6 @@ import {
 import { parseIsoDateTime } from "../utils/dateParsing.js";
 import type { RoomId } from "../domain/room.js";
 
-/**
- * HTTP DTO varaukselle – Date → ISO string.
- */
 interface ReservationDto {
   id: string;
   roomId: RoomId;
@@ -76,10 +73,7 @@ export const registerReservationRoutes = (
   app: FastifyInstance,
   service: ReservationService,
 ) => {
-  /**
-   * GET /rooms/:roomId/reservations
-   * Palauttaa huoneen kaikki varaukset.
-   */
+  // Palauttaa huoneen kaikki varaukset.
   app.get(
     "/rooms/:roomId/reservations",
     async (
@@ -109,21 +103,14 @@ export const registerReservationRoutes = (
     },
   );
 
-  /**
-   * GET /reservations
-   * Palauttaa kaikki varaukset huoneesta riippumatta.
-   * (debug / admin -henkinen reitti)
-   */
+  // Palauttaa kaikki varaukset huoneesta riippumatta. (debug / admin -henkinen reitti)
   app.get("/reservations", async (_request, reply) => {
     const reservations = await service.listAllReservations();
     const dtos = reservations.map(toReservationDto);
     return reply.status(200).send(dtos);
   });
 
-  /**
-   * POST /rooms/:roomId/reservations
-   * Luo uuden varauksen.
-   */
+  // Luo uuden varauksen.
   app.post(
     "/rooms/:roomId/reservations",
     async (
@@ -190,13 +177,9 @@ export const registerReservationRoutes = (
     },
   );
 
-  /**
-   * DELETE /rooms/:roomId/reservations/:reservationId
-   * Poistaa varauksen id:n perusteella.
-   *
-   * Huom: roomId on mukana URL:ssa REST-tyylisesti, mutta
-   * poistologikka perustuu reservationId:hen.
-   */
+  // Poistaa varauksen id:n perusteella.
+  // Huom: roomId on mukana URL:ssa REST-tyylisesti, mutta
+  // poistologikka perustuu reservationId:hen.
   app.delete(
     "/rooms/:roomId/reservations/:reservationId",
     async (

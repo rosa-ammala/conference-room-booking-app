@@ -49,9 +49,7 @@ export class ReservationService {
     private readonly repository: ReservationRepository,
   ) {}
 
-  /**
-   * Listaa kaikki varaukset yhdelle huoneelle.
-   */
+  // Listaa kaikki varaukset yhdelle huoneelle.
   async listReservationsForRoom(
     input: ListReservationsForRoomInput,
   ): Promise<Result<Reservation[], ReservationError>> {
@@ -72,17 +70,13 @@ export class ReservationService {
     return ok(reservations);
   }
 
-  /**
-   * Listaa kaikki varaukset riippumatta huoneesta.
-   * Tälle ei ole käytännössä virhetilaa, joten palautetaan suoraan lista.
-   */
+  // Listaa kaikki varaukset riippumatta huoneesta. 
+  // Tälle ei ole käytännössä virhetilaa, joten palautetaan suoraan lista.
   async listAllReservations(): Promise<Reservation[]> {
     return this.repository.listAll();
   }
 
-  /**
-   * Luo uuden varauksen business-sääntöjä noudattaen.
-   */
+  // Luo uuden varauksen business-sääntöjä noudattaen.
   async createReservation(
     input: CreateReservationInput,
   ): Promise<Result<Reservation, ReservationError>> {
@@ -161,9 +155,7 @@ export class ReservationService {
     return ok(created);
   }
 
-  /**
-   * Poistaa varauksen id:n perusteella.
-   */
+  // Poistaa varauksen id:n perusteella.
   async deleteReservation(
     input: DeleteReservationInput,
   ): Promise<Result<void, ReservationError>> {

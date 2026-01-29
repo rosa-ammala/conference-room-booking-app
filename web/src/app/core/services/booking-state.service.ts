@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import {
   BookingState,
-  UtcDateKey,
+  DateKey,
 } from '../models/booking-state.model';
 import {
   Reservation,
@@ -37,7 +37,7 @@ export class BookingStateService {
     this.patchState({ selectedRoomId: roomId });
   }
 
-  setSelectedDateKey(dateKey: UtcDateKey): void {
+  setSelectedDateKey(dateKey: DateKey): void {
     this.patchState({
       selectedDateKey: dateKey,
       selectedStartIsoUtc: null,
@@ -94,7 +94,7 @@ export class BookingStateService {
     this.stateSubject.next(this.initialState);
   }
 
-  /** Palauttaa nykyisen tilan synkronisesti (esim. lomakkeen submitissa). */
+  // Palauttaa nykyisen tilan synkronisesti (esim. lomakkeen submitissa).
   getSnapshot(): BookingState {
     return this.stateSubject.value;
   }
