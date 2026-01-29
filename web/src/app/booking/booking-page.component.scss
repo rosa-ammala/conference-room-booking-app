@@ -1,12 +1,12 @@
 .booking-page {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) 1fr;
+  grid-template-columns: 6fr 4fr;
   gap: 1.5rem;
   align-items: flex-start;
 }
 
-.booking-page__sidebar,
-.booking-page__main {
+.booking-page__left,
+.booking-page__right {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
