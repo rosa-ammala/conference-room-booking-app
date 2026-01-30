@@ -1,4 +1,4 @@
-import { Component, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { Room } from '../core/models/room.model';
@@ -22,15 +22,11 @@ import { ReservationFormComponent } from './reservation-form.component';
   templateUrl: './booking-page.component.html',
   styleUrls: ['./booking-page.component.scss'],
 })
-export class BookingPageComponent implements OnDestroy {
-  readonly rooms: Room[] = [
-    { id: 'room-a', name: 'Room A' },
-    { id: 'room-b', name: 'Room B' },
-    { id: 'room-c', name: 'Room C' },
-  ];
-
+export class BookingPageComponent implements OnInit, OnDestroy {
+  rooms: Room[] = [];
   selectedRoomId: string | null = null;
   loadError: string | null = null;
+  isLoadingRooms = true;
 
   private subscription?: Subscription;
   private loadedRoomIds = new Set<string>();
@@ -38,14 +34,28 @@ export class BookingPageComponent implements OnDestroy {
   constructor(
     private readonly bookingState: BookingStateService,
     private readonly reservationsApi: ReservationsApiService
-  ) {
-    // Alusta oletushuoneeksi ensimmäinen listasta
-    const defaultRoomId = this.rooms[0]?.id ?? null;
-    if (defaultRoomId) {
-      this.bookingState.setSelectedRoomId(defaultRoomId);
-      this.loadReservationsForRoomIfNeeded(defaultRoomId);
-      this.selectedRoomId = defaultRoomId;
-    }
+  ) {}
+
+  ngOnInit(): void {
+    this.reservationsApi.getRooms().subscribe({
+      next: (rooms) => {
+        this.rooms = rooms;
+        this.isLoadingRooms = false;
+
+        // Aseta oletushuone, jos mikään ei ole vielä valittuna
+        const defaultRoomId = this.rooms[0]?.id ?? null;
+        if (defaultRoomId) {
+          this.bookingState.setSelectedRoomId(defaultRoomId);
+          this.loadReservationsForRoomIfNeeded(defaultRoomId);
+          this.selectedRoomId = defaultRoomId;
+        }
+      }, 
+      error: (error) => {
+        console.error('Virhe haettaessa huoneita', error);
+        this.loadError = 'Huoneiden lataaminen epäonnistui.';
+        this.isLoadingRooms = false;
+      }
+    });
 
     // Kuunnellaan huoneen vaihtumista ja haetaan varaukset uudelle huoneelle
     this.subscription = this.bookingState.state$.subscribe((state) => {

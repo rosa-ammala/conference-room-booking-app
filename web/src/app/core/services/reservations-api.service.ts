@@ -8,6 +8,7 @@ import {
   RoomId,
 } from '../models/reservation.model';
 import { environment } from '../../../environments/environment';
+import { Room } from '../models/room.model';
 
 @Injectable({
   providedIn: 'root',
@@ -16,6 +17,10 @@ export class ReservationsApiService {
   private readonly apiBaseUrl = environment.apiBaseUrl;
 
   constructor(private readonly http: HttpClient) {}
+
+  getRooms(): Observable<Room[]> {
+    return this.http.get<Room[]>(`${this.apiBaseUrl}/rooms`);
+  }
 
   // Palauttaa kaikki annetun huoneen varaukset.
   getRoomReservations(roomId: RoomId): Observable<Reservation[]> {

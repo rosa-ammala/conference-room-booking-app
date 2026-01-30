@@ -16,11 +16,21 @@
   <section class="booking-page__right">
     <section class="booking-page__block">
       <h2 class="booking-page__block-title">Huone</h2>
-      <app-room-selector
-        [rooms]="rooms"
-        [selectedRoomId]="selectedRoomId"
-        (roomSelected)="onRoomSelected($event)"
-      ></app-room-selector>
+      @if (isLoadingRooms) {
+        <div>Ladataan huoneita...</div>
+      }
+
+      @if (loadError) {
+        <div class="booking-page__error">{{ loadError }}</div>
+      }
+
+      @if (!isLoadingRooms && rooms.length > 0) {
+        <app-room-selector
+          [rooms]="rooms"
+          [selectedRoomId]="selectedRoomId"
+          (roomSelected)="onRoomSelected($event)"
+        ></app-room-selector>
+      }
     </section>
 
     <section class="booking-page__block">

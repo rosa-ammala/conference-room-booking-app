@@ -7701,7 +7701,57 @@ Muutokset tiivistettynä:
 ---
 
 ### Kehote
-
+Mitä vaatisi, jos haluaisin synkronoida frontendin RoomId:n backendin kanssa? Eli kuinka paljon muutoksia vaatii huoneiden hakeminen backendista? Kerro lyhyesti mahdolliset muutokset, joita se vaatisi.
 
 ### Vastaus
+Lyhyesti: ei “paljoa”, mutta vähän joka kerrokseen 👇
+
+##### Backend
+1. **Huonelista domainiin**
+   * Esim. `rooms.ts`:
+     ```ts
+     export const ROOMS = [
+       { id: 'room-a', name: 'Room A' },
+       { id: 'room-b', name: 'Room B' },
+       { id: 'room-c', name: 'Room C' },
+     ] as const;
+
+     export type RoomId = (typeof ROOMS)[number]['id'];
+     ```
+   * Käytä tätä samaa `RoomId`-tyyppiä kaikkialla (reservation service, Zod-schemat, reitit).
+
+2. **Uusi endpoint huoneille**
+   * Esim.:
+     ```ts
+     app.get('/rooms', async (_req, reply) => {
+       reply.status(200).send(ROOMS);
+     });
+     ```
+   * Halutessa DTO + Zod-schema (id, name).
+
+3. **Nykyisten reittien tiukennus**
+   * `roomIdParamsSchema` voi validoida, että `roomId` ∈ `ROOMS` (esim. Zod `z.enum([...])` joka generoidaan `ROOMS`-datasta).
+
+##### Frontend
+1. **Room-tyyppi & service**
+   * Tee `Room`-interface (id, name) vastaamaan backendin DTO:ta.
+   * Lisää `RoomService` / laajenna nykyistä API-servicen metodia:
+     ```ts
+     getRooms(): Observable<Room[]> { ... }
+     ```
+
+2. **Huonelistojen korvaus**
+   * Poista hardkoodatut huoneet (esim. enum/array komponentissa).
+   * Lataa huoneet:
+     * esim. `ngOnInit` → `roomService.getRooms()` → tallenna `rooms$` / `rooms` stateen.
+   * Käytä `rooms`-listaa chip-nappien renderöintiin ja initial-roomin valintaan.
+3. **Valitun huoneen tila**
+   * Booking state / formin oletus-huone haetaan vasta kun `rooms` on ladattu (esim. ota ensimmäinen huone id:ksi).
+   * Varmista, ettei UI yritä tehdä pyyntöjä ennen kuin `selectedRoomId` on asetettu.
+4. **Virhe- ja loading-tila (kevyt)**
+   * Esim. `*ngIf="rooms$ | async as rooms; else loading"` ja mahdollinen virheilmoitus jos pyyntö epäonnistuu.
+
+Yhteenveto:
+* **Backend:** 1 vakiohuonelista + 1 uusi `/rooms`-reitti + pienehkö tyyppien siistiminen.
+* **Frontend:** 1 API-kutsu lisää + hardkoodauksen poisto + pientä state- ja UI-säätöä (loading/virhe).
 

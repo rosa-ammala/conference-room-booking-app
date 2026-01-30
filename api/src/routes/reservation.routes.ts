@@ -11,7 +11,7 @@ import {
   type CreateReservationBody,
 } from "../validation/reservationSchemas.js";
 import { parseIsoDateTime } from "../utils/dateParsing.js";
-import type { RoomId } from "../domain/room.js";
+import { ROOMS, type RoomId } from "../domain/room.js";
 
 interface ReservationDto {
   id: string;
@@ -56,6 +56,10 @@ export const registerReservationRoutes = (
   app: FastifyInstance,
   service: ReservationService,
 ) => {
+  app.get("/rooms", async () => {
+    return ROOMS;
+  });
+
   // Palauttaa huoneen kaikki varaukset.
   app.get("/rooms/:roomId/reservations", async (request: FastifyRequest<{ Params: RoomIdParams }>) => {
     const { roomId } = roomIdParamsSchema.parse(request.params);
