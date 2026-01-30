@@ -1,11 +1,13 @@
 # Conference Room Booking App
-Tässä projektissa rakennetaan kokoushuoneiden varausjärjestelmä, joka koostuu backend-API:sta ja frontend-web-sovelluksesta. Käyttöliittymä on tukemassa rajapintaa visuaalisesti. Backend toteutetaan Node.js:llä, TypeScriptillä sekä Fastifylla ja frontend Angularilla.
+
+Sovellus: [https://conference-room-booking-app-1.onrender.com/](https://conference-room-booking-app-1.onrender.com/)
+
+Tässä projektissa rakennettiin kokoushuoneiden varausjärjestelmä, joka koostuu backend-API:sta ja frontend-web-sovelluksesta. Käyttöliittymä on tukemassa rajapintaa visuaalisesti. Backend toteutetaan Node.js:llä, TypeScriptillä sekä Fastifylla ja frontend Angularilla.
 
 ## Tech Stack
 - **AI**: ChatGPT
 - **Backend**: Node.js + TypeScript + Fastify + Zod
-- **Frontend**: Angular + TypeScript + Angular Material 
-- **Testaus**: VSCode Rest Client
+- **Frontend**: Angular + TypeScript + Angular Material
 
 ## Toiminnot
 - **Huoneen varaus** tietylle aikavälille.
@@ -46,14 +48,17 @@ Perusmallit:
   - `title` (vapaa string tekstikenttä, kokouksen nimi/aihe)
   - `host` (vapaa string tekstikenttä, kokouksen järjestäjä esim. henkilö tai tiimi, ei liity käyttäjähallintaan)
 
-Huoneet ovat **kovakoodattuja** tai konfiguraatiossa määriteltyjä; niihin ei ole API-toiminnallisuutta (ei CRUDia huoneille).
-
 Tietovarasto on **in-memory**: kaikki häviää palvelimen uudelleenkäynnistyksessä.
 
 ---
 
-## API (luonnos)
+## API
 Tämä osio toimii ohjeena sekä toteutukselle että käytölle. Toteutus voi tarkentua, mutta pääidea on:
+
+### Listaa kaikki huoneet
+`GET /rooms`
+
+- Kaikkien huoneiden listaus. Käytetään UI:ssa saatavilla olevina huoneina. 
 
 ### Listaa huoneen varaukset
 `GET /rooms/:roomId/reservations`
@@ -95,11 +100,14 @@ Body (esimerkki):
 
 Käyttäjä:
 1. Valitsee huoneen.
-2. Valitsee päivämäärän.
+2. Valitsee päivämäärän. (kuukausi- tai viikkokalenterista)
 3. Valitsee kokouksen keston.
 4. Valitsee aloitusajan (vapaat slotit).
 5. Antaa kokouksen nimen.
 6. Tallentaa varauksen.
+7. Katselee valitun huoneen varauksia kuukausikalenterista.
+8. Klikkaa yhtä varausta kalenterista poistaakseen sen.
+9. Hyväksyy ikkunassa varauksen poiston.
 
 ### Huoneiden valinta
 - Huoneet valitaan tagi-/chippinapeilla (Angular Material chips / buttons) lomakkeen yläosassa.
@@ -135,8 +143,8 @@ Kesto valitaan chip-tyylisillä napeilla:
     - Huoneessa on jo varaus ajalle 10.00-10.30.
     - Käyttäjä valitsee uuden kokouksen kestoksi 1h → aloitusajat 9.30 ja 10.00 eivät ole saatavilla, koska ne menisivät päällekkäin olemassa olevan varauksen kanssa.
 
-### Kokouksen nimi
-Tekstikenttä on pakollinen ja se tallennetaan varaukselle title-kenttään.
+### Kokouksen/Varaajan nimi
+Tekstikenttä on pakollinen ja se tallennetaan varaukselle title/host-kenttään.
 
 ### Varauksen näyttäminen ja poistaminen
 - Varaus näkyy kuukausikalenterissa kyseisen päivän sisällä muodossa: `10.00-11.30 Tiimipalaveri`
