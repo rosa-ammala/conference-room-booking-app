@@ -116,14 +116,7 @@ export class ReservationFormComponent implements OnInit, OnDestroy {
     this.reservationsApi.createReservation(request).subscribe({
       next: (created: Reservation) => {
         // Päivitetään huoneen varauslista lisäämällä uusi varaus
-        const current = this.bookingState.getSnapshot();
-        const existingForRoom = current.reservationsByRoomId[roomId] ?? [];
-        const updatedForRoom = [...existingForRoom, created];
-
-        this.bookingState.setReservationsForRoom(
-          roomId,
-          updatedForRoom
-        );
+        this.bookingState.addReservationToRoom(created);
 
         // Resetoi uusi-varaus -valinnat (mutta pidä huone ja päivä)
         this.bookingState.resetSelectionForNewReservation();

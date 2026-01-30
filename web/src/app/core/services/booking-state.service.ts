@@ -64,32 +64,9 @@ export class BookingStateService {
     this.patchState({ selectedStartIsoUtc: startIsoUtc });
   }
 
-  loadReservationsForRoom(roomId: RoomId): void {
-    if (this.loadedRoomIds.has(roomId)) return;
-    
-    this.reservationsApi.getRoomReservations(roomId).subscribe({
-      next: (reservations) => {
-        this.setReservationsForRoom(roomId, reservations);
-        this.loadedRoomIds.add(roomId);
-      },
-      error: (error) => {
-        console.error('Virhe haettaessa varauksia huoneelle', roomId, error);
-      },
-    });
-  }
-
-  setReservationsForRoom(roomId: RoomId, reservation: Reservation[]): void {
+  addReservationToRoom(reservation: Reservation): void {
     const current = this.stateSubject.value;
-    const updatedByRoom = {
-      ...current.reservationsByRoomId,
-      [roomId]: reservation,
-    };
-    console.log('Säädetään varaukset huoneelle', roomId, reservation);
-    this.patchState({ reservationsByRoomId: updatedByRoom });
-  }
-
-  addReservationToRoom(roomId: RoomId, reservation: Reservation): void {
-    const current = this.stateSubject.value;
+    const roomId = reservation.roomId;
     const currentList = current.reservationsByRoomId[roomId] ?? [];
     const updatedByRoom = {
       ...current.reservationsByRoomId,
@@ -98,10 +75,7 @@ export class BookingStateService {
     this.patchState({ reservationsByRoomId: updatedByRoom });
   }
 
-  removeReservationFromRoom(
-    roomId: RoomId,
-    reservationId: ReservationId
-  ): void {
+  removeReservationFromRoom(roomId: RoomId, reservationId: ReservationId): void {
     const current = this.stateSubject.value;
     const currentList = current.reservationsByRoomId[roomId] ?? [];
     const nextList = currentList.filter((r) => r.id !== reservationId);
@@ -129,6 +103,30 @@ export class BookingStateService {
   // Palauttaa nykyisen tilan synkronisesti (esim. lomakkeen submitissa).
   getSnapshot(): BookingState {
     return this.stateSubject.value;
+  }
+
+  private loadReservationsForRoom(roomId: RoomId): void {
+    if (this.loadedRoomIds.has(roomId)) return;
+    
+    this.reservationsApi.getRoomReservations(roomId).subscribe({
+      next: (reservations) => {
+        this.setReservationsForRoom(roomId, reservations);
+        this.loadedRoomIds.add(roomId);
+      },
+      error: (error) => {
+        console.error('Virhe haettaessa varauksia huoneelle', roomId, error);
+      },
+    });
+  }
+
+  private setReservationsForRoom(roomId: RoomId, reservation: Reservation[]): void {
+    const current = this.stateSubject.value;
+    const updatedByRoom = {
+      ...current.reservationsByRoomId,
+      [roomId]: reservation,
+    };
+    console.log('Säädetään varaukset huoneelle', roomId, reservation);
+    this.patchState({ reservationsByRoomId: updatedByRoom });
   }
 
   private patchState(partial: Partial<BookingState>): void {
