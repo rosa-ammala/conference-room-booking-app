@@ -12,6 +12,7 @@ import {
 } from '../models/reservation.model';
 import { todayDateKeyUtc } from '../utils/date-time.util';
 import { BOOKING_CONFIG } from '../../config/booking.config';
+import { ReservationsApiService } from './reservations-api.service';
 
 @Injectable({
   providedIn: 'root',
@@ -32,10 +33,17 @@ export class BookingStateService {
   /** Koko tila read-onlynä UI:lle */
   readonly state$ = this.stateSubject.asObservable();
 
-  constructor() {}
+  private loadedRoomIds = new Set<RoomId>();
+
+  constructor(
+    private readonly reservationsApi: ReservationsApiService
+  ) {}
 
   setSelectedRoomId(roomId: RoomId | null): void {
     this.patchState({ selectedRoomId: roomId });
+    if (roomId) {
+      this.loadReservationsForRoom(roomId);
+    }
   }
 
   setSelectedDateKey(dateKey: DateKey): void {
@@ -56,14 +64,37 @@ export class BookingStateService {
     this.patchState({ selectedStartIsoUtc: startIsoUtc });
   }
 
-  setReservationsForRoom(roomId: RoomId, reservations: Reservation[]): void {
+  loadReservationsForRoom(roomId: RoomId): void {
+    if (this.loadedRoomIds.has(roomId)) return;
+    
+    this.reservationsApi.getRoomReservations(roomId).subscribe({
+      next: (reservations) => {
+        this.setReservationsForRoom(roomId, reservations);
+        this.loadedRoomIds.add(roomId);
+      },
+      error: (error) => {
+        console.error('Virhe haettaessa varauksia huoneelle', roomId, error);
+      },
+    });
+  }
+
+  setReservationsForRoom(roomId: RoomId, reservation: Reservation[]): void {
     const current = this.stateSubject.value;
     const updatedByRoom = {
       ...current.reservationsByRoomId,
-      [roomId]: reservations,
+      [roomId]: reservation,
     };
-    console.log('Säädetään varaukset huoneelle', roomId, reservations);
+    console.log('Säädetään varaukset huoneelle', roomId, reservation);
+    this.patchState({ reservationsByRoomId: updatedByRoom });
+  }
 
+  addReservationToRoom(roomId: RoomId, reservation: Reservation): void {
+    const current = this.stateSubject.value;
+    const currentList = current.reservationsByRoomId[roomId] ?? [];
+    const updatedByRoom = {
+      ...current.reservationsByRoomId,
+      [roomId]: [...currentList, reservation],
+    };
     this.patchState({ reservationsByRoomId: updatedByRoom });
   }
 

@@ -29,7 +29,6 @@ export class BookingPageComponent implements OnInit, OnDestroy {
   isLoadingRooms = true;
 
   private subscription?: Subscription;
-  private loadedRoomIds = new Set<string>();
 
   constructor(
     private readonly bookingState: BookingStateService,
@@ -46,7 +45,6 @@ export class BookingPageComponent implements OnInit, OnDestroy {
         const defaultRoomId = this.rooms[0]?.id ?? null;
         if (defaultRoomId) {
           this.bookingState.setSelectedRoomId(defaultRoomId);
-          this.loadReservationsForRoomIfNeeded(defaultRoomId);
           this.selectedRoomId = defaultRoomId;
         }
       }, 
@@ -60,10 +58,6 @@ export class BookingPageComponent implements OnInit, OnDestroy {
     // Kuunnellaan huoneen vaihtumista ja haetaan varaukset uudelle huoneelle
     this.subscription = this.bookingState.state$.subscribe((state) => {
       this.selectedRoomId = state.selectedRoomId;
-      const roomId = state.selectedRoomId;
-      if (roomId) {
-        this.loadReservationsForRoomIfNeeded(roomId);
-      }
     });
   }
 
@@ -73,23 +67,5 @@ export class BookingPageComponent implements OnInit, OnDestroy {
 
   onRoomSelected(roomId: string): void {
     this.bookingState.setSelectedRoomId(roomId);
-    // varmuuden vuoksi varmistetaan haku tässäkin
-    this.loadReservationsForRoomIfNeeded(roomId);
-  }
-
-  private loadReservationsForRoomIfNeeded(roomId: string): void {
-    if (this.loadedRoomIds.has(roomId)) return;
-
-    this.reservationsApi.getRoomReservations(roomId).subscribe({
-      next: (reservations) => {
-        this.bookingState.setReservationsForRoom(roomId, reservations);
-        this.loadedRoomIds.add(roomId);
-        this.loadError = null;
-      },
-      error: (error) => {
-        console.error('Virhe haettaessa varauksia huoneelle', roomId, error);
-        this.loadError = 'Huoneen varausten lataaminen epäonnistui. Yritä päivittää sivu.';
-      },
-    });
   }
 }
