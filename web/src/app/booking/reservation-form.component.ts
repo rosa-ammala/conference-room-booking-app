@@ -9,7 +9,6 @@ import {
   computeDaySlots,
   filterReservationsForDate,
 } from '../core/utils/slot.util';
-import { environment } from '../../environments/environment';
 import { ReservationsApiService } from '../core/services/reservations-api.service';
 import { BOOKING_CONFIG } from '../config/booking.config';
 
@@ -21,7 +20,7 @@ import { BOOKING_CONFIG } from '../config/booking.config';
   styleUrls: ['./reservation-form.component.scss'],
 })
 export class ReservationFormComponent implements OnInit, OnDestroy {
-  readonly durations: ReservationDurationMinutes[] = [];
+  readonly durations: ReservationDurationMinutes[] = [30, 60, 120, 180];
 
   selectedDuration: ReservationDurationMinutes = BOOKING_CONFIG.DEFAULT_DURATION_MINUTES;
   timeSlots: SlotInfo[] = [];

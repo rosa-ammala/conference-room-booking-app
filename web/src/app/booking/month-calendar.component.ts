@@ -41,6 +41,7 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
 
   private currentMonthAnchorDateKey: DateKey;
   private subscription?: Subscription;
+  private lastRebuildParams = { selectedDateKey: '', selectedRoomId: '', reservationsCount: 0 };
 
   constructor(
     private readonly bookingState: BookingStateService,
@@ -48,17 +49,28 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
     private readonly cdr: ChangeDetectorRef
   ) {
     // Ankkurikuukausi alussa = valitun päivän kuukausi
-    this.currentMonthAnchorDateKey =
-      bookingState.getSnapshot().selectedDateKey;
+    this.currentMonthAnchorDateKey = bookingState.getSnapshot().selectedDateKey;
   }
 
   ngOnInit(): void {
     this.subscription = this.bookingState.state$.subscribe((state) => {
-      this.rebuildCalendar(
-        state.selectedDateKey,
-        state.selectedRoomId,
-        state.reservationsByRoomId[state.selectedRoomId ?? ''] ?? []
-      );
+      const reservations = state.reservationsByRoomId[state.selectedRoomId ?? ''] ?? [];
+
+      if (this.shouldRebuild(state.selectedDateKey, state.selectedRoomId, reservations)) {
+        this.rebuildCalendar(
+          state.selectedDateKey,
+          state.selectedRoomId,
+          reservations
+        );
+        this.lastRebuildParams = {
+          selectedDateKey: state.selectedDateKey,
+          selectedRoomId: state.selectedRoomId ?? '',
+          reservationsCount: reservations.length,
+        };
+      } else {
+        this.updateReservationsOnly(state.selectedDateKey, state.selectedRoomId, reservations);
+      }
+
       this.cdr.markForCheck();
     });
   }
@@ -68,10 +80,7 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
   }
 
   onPrevMonth(): void {
-    this.currentMonthAnchorDateKey = addMonthsToDateKey(
-      this.currentMonthAnchorDateKey,
-      -1
-    );
+    this.currentMonthAnchorDateKey = addMonthsToDateKey(this.currentMonthAnchorDateKey, -1);
     const snapshot = this.bookingState.getSnapshot();
     this.rebuildCalendar(
       snapshot.selectedDateKey,
@@ -83,10 +92,7 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
   }
 
   onNextMonth(): void {
-    this.currentMonthAnchorDateKey = addMonthsToDateKey(
-      this.currentMonthAnchorDateKey,
-      +1
-    );
+    this.currentMonthAnchorDateKey = addMonthsToDateKey(this.currentMonthAnchorDateKey, +1);
     const snapshot = this.bookingState.getSnapshot();
     this.rebuildCalendar(
       snapshot.selectedDateKey,
@@ -98,9 +104,7 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
   }
 
   onSelectDay(day: MonthDayViewModel): void {
-    if (day.isWeekendOrPast) {
-      return;
-    }
+    if (day.isWeekendOrPast) return;
     this.bookingState.setSelectedDateKey(day.dateKey);
   }
 
@@ -120,7 +124,6 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
         // Poistetaan varaus frontin tilasta
         this.bookingState.removeReservationFromRoom(roomId, reservation.id);
         this.deleteError = null;
-        console.log('Varaus poistettu', reservation.id);
       },
       error: (error) => {
         console.error('Varauksen poisto epäonnistui', error);
@@ -131,6 +134,22 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
 
   getReservationSummary(reservation: Reservation): string {
     return formatReservationSummary(reservation);
+  }
+
+  private shouldRebuild(selectedDateKey: DateKey, selectedRoomId: string | null, reservations: Reservation[]): boolean {
+    return (
+      this.lastRebuildParams.selectedRoomId !== (selectedRoomId ?? '') ||
+      reservations.length !== this.lastRebuildParams.reservationsCount ||
+      this.days.length === 0
+    );
+  }
+
+  private updateReservationsOnly(selectedDateKey: DateKey, selectedRoomId: string | null, allReservationsForRoom: Reservation[]): void {
+    this.days = this.days.map(day => ({
+      ...day,
+      isSelected: day.dateKey === selectedDateKey,
+      reservations: selectedRoomId ? filterReservationsForDate(allReservationsForRoom, day.dateKey) : [],
+    }));
   }
 
   private rebuildCalendar(
@@ -165,13 +184,11 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
       const isWeekendOrPast = isWeekend || isPast;
       const isSelected = dateKey === selectedDateKey;
 
-      let reservationsForDay: Reservation[] = [];
-      if (selectedRoomId) {
-        reservationsForDay = filterReservationsForDate(
+      const reservationsForDay = selectedRoomId 
+        ? filterReservationsForDate(
           allReservationsForRoom,
           dateKey
-        );
-      }
+        ) : [];
 
       days.push({
         dateKey,
@@ -183,8 +200,6 @@ export class MonthCalendarComponent implements OnInit, OnDestroy {
       });
     }
     this.days = days;
-
-    console.log('Kalenteri rakennettu:', days);
 
     // Kuukausiotsikko
     const monthName = getMonthNameFi(firstOfMonth);
