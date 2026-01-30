@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ALLOWED_DURATIONS } from "../domain/reservation.js";
+import { ALLOWED_DURATIONS, type DurationMinutes } from "../domain/reservation.js";
 
 export const roomIdParamsSchema = z.object({
   roomId: z.string().min(1, "roomId is required"),
@@ -18,7 +18,7 @@ export const createReservationBodySchema = z.object({
     .number()
     .int("durationMinutes must be an integer")
     .refine(
-      (value) => ALLOWED_DURATIONS.includes(value as any),
+      (value): value is DurationMinutes => ALLOWED_DURATIONS.includes(value as DurationMinutes),
       {
         message: `durationMinutes must be one of [${ALLOWED_DURATIONS.join(
           ", ",
