@@ -1,41 +1,16 @@
-import Fastify from "fastify";
-import cors from '@fastify/cors';
-import { InMemoryReservationRepository } from "./repositories/inMemoryReservationRepository.js";
-import { ReservationService } from "./services/reservationService.js";
-import { registerReservationRoutes } from "./routes/reservation.routes.js";
-
-const app = Fastify({
-  logger: true,
-});
-
-await app.register(cors, {
-  origin: 'http://localhost:4200', // Angular dev server
-  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type'],
-});
-
-// DI: repo → service → reitit
-const reservationRepository = new InMemoryReservationRepository();
-const reservationService = new ReservationService(
-  reservationRepository,
-);
-
-// Rekisteröidään varausreitit
-registerReservationRoutes(app, reservationService);
-
-app.get("/health", async () => {
-  return { status: "ok" };
-});
-
-const PORT = Number(process.env.PORT) || 3000;
-const HOST = process.env.HOST || "0.0.0.0";
+import { createApp } from "./app.js";
+import { createContainer } from "./container.js";
+import { env } from "./config/env.js";
 
 const start = async () => {
   try {
-    await app.listen({ port: PORT, host: HOST });
-    app.log.info(`Server listening on http://${HOST}:${PORT}`);
+    const container = createContainer();
+    const app = createApp(container);
+
+    await app.listen({ port: env.port, host: env.host });
+    app.log.info(`Server listening on http://${env.host}:${env.port}`);
   } catch (err) {
-    app.log.error(err);
+    console.error(err);
     process.exit(1);
   }
 };

@@ -1,5 +1,5 @@
-import { InMemoryReservationRepository } from "./repositories/inMemoryReservationRepository.js";
-import { ReservationService } from "./services/reservationService.js";
+import { InMemoryReservationRepository } from "../repositories/inMemoryReservationRepository.js";
+import { ReservationService } from "../services/reservationService.js";
 
 const run = async () => {
   const repository = new InMemoryReservationRepository();
