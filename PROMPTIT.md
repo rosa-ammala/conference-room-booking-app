@@ -7553,13 +7553,150 @@ Haluan lisätä suodatuksen, joka lisää la ja su päiville saman disapled tila
   }
 
 ### Vastaus
+Lyhyesti ja suoraan:
+Lisää **weekend-tunnistus** ja yhdistä se `isPast`-logiikkaan (tai erilliseksi flagiksi, jos haluat joustoa).
+
+Minimimuutos:
+```ts
+const jsDay = d.getDay(); // 0=Su, 6=La
+const isWeekend = jsDay === 0 || jsDay === 6;
+
+const isPast = dateKey < todayKey || isWeekend;
+```
+
+ja pidä view-mallissa ennallaan:
+```ts
+days.push({
+  dateKey,
+  dayOfMonth: d.getDate(),
+  isCurrentMonth,
+  isSelected,
+  isPast, // viikonloput käyttäytyvät kuin menneet päivät
+  reservations: reservationsForDay,
+});
+```
+
+👉 Ei muutoksia kalenterin rakenteeseen, vain yksi ehto lisää.
+👉 Sama CSS / disabled-tila toimii automaattisesti.
 
 ---
 
 ### Kehote
-
+Haluan parantaa api/ kansiossa virheiden käsittelyä. Backendissa on käytössä Fastify. Virheitä varten voitaisiin luoda oma error handler tiedosto. Mitä se voisi sisältää ja miten sitä käytettäisiin? Pidä vastaus lyhyenä!
 
 ### Vastaus
+Lyhyt ja käytännöllinen malli 👇
+##### `error-handler.ts`
+
+Sisältäisi:
+* **Yhteisen Fastify error handlerin**
+* **Tunnettujen virheiden** (esim. Zod, omat domain-virheet) mappauksen HTTP-statuksiin
+* **Yhtenäisen virhevastausmuodon** frontendille
+* **Loggauksen** (dev vs prod -erot)
+
+```ts
+import { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
+import { ZodError } from 'zod';
+
+export function errorHandler(
+  error: FastifyError,
+  _req: FastifyRequest,
+  reply: FastifyReply
+) {
+  if (error instanceof ZodError) {
+    return reply.status(400).send({
+      error: 'VALIDATION_ERROR',
+      details: error.errors,
+    });
+  }
+
+  if (error.statusCode) {
+    return reply.status(error.statusCode).send({
+      error: error.name,
+      message: error.message,
+    });
+  }
+
+  reply.status(500).send({
+    error: 'INTERNAL_SERVER_ERROR',
+    message: 'Something went wrong',
+  });
+}
+```
+
+##### Käyttö
+Rekisteröidään **yhdessä paikassa** (esim. `server.ts` / `app.ts`):
+```ts
+fastify.setErrorHandler(errorHandler);
+```
+
+##### Hyödyt
+* Ei try/catchia jokaisessa reitissä
+* Yhtenäiset API-virheet
+* Helppo laajentaa (esim. `DomainError`, `ConflictError`, jne.)
+
+Jos haluat, seuraava askel olisi **omat custom error -luokat** 👌
+
+---
+
+### Kehote
+Miten esimerkiksi tämä: 
+  app.get("/rooms/:roomId/reservations", async (
+      request: FastifyRequest<{ Params: RoomIdParams }>,
+      reply: FastifyReply,
+    ) => {
+      const parseResult = roomIdParamsSchema.safeParse(request.params);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          message: "Invalid params",
+          issues: parseResult.error.issues,
+        });
+      }
+
+      const { roomId } = parseResult.data;
+
+      const result = await service.listReservationsForRoom({
+        roomId,
+      });
+
+      if (!result.ok) {
+        return sendReservationError(reply, result.error);
+      }
+
+      const dtos = result.value.map(toReservationDto);
+      return reply.status(200).send(dtos);
+    },
+  );
+muuttuu uuden errorHandlerin tultua mukaan? Näytä esimerkkinä vain tämä yksi reitti.
+
+### Vastaus
+Se voisi näyttää vaikka tältä – eli reitti keskittyy vain “happy pathiin”, ja virheet annetaan globaalin errorHandlerin hoidettavaksi:
+```ts
+app.get(
+  '/rooms/:roomId/reservations',
+  async (
+    request: FastifyRequest<{ Params: RoomIdParams }>,
+    reply: FastifyReply,
+  ) => {
+    // Heitetään virhe, jonka errorHandler nappaa (ZodError -> 400)
+    const { roomId } = roomIdParamsSchema.parse(request.params);
+
+    const result = await service.listReservationsForRoom({ roomId });
+
+    if (!result.ok) {
+      // Domain-virhe, jonka errorHandler mapittaa statukseksi + bodyksi
+      throw result.error;
+    }
+
+    const dtos = result.value.map(toReservationDto);
+    return reply.status(200).send(dtos);
+  },
+);
+```
+
+Muutokset tiivistettynä:
+* Ei `safeParse` + manuaalista `reply.status(400)...`, vaan `parse()` → ZodError → `errorHandler`.
+* Ei `sendReservationError(reply, ...)`, vaan `throw result.error;` → `errorHandler` päättää statuksen ja vastauksen.
 
 ---
 

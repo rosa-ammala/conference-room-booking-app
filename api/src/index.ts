@@ -7,3 +7,4 @@ export * from "./services/reservationService.js";
 export * from "./utils/dateParsing.js"
 export * from "./utils/result.js";
 export * from "./utils/time.js";
+export * from "./plugins/errorHandler.js";

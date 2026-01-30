@@ -1,12 +1,6 @@
-import type {
-  FastifyInstance,
-  FastifyReply,
-  FastifyRequest,
-} from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { ReservationService } from "../services/reservationService.js";
-import type {
-  ReservationError,
-} from "../services/reservationService.js";
+import type { ReservationError } from "../services/reservationService.js";
 import type { Reservation } from "../domain/reservation.js";
 import {
   roomIdParamsSchema,
@@ -58,99 +52,49 @@ const mapReservationErrorToStatus = (error: ReservationError): number => {
   }
 };
 
-const sendReservationError = (
-  reply: FastifyReply,
-  error: ReservationError,
-) => {
-  const status = mapReservationErrorToStatus(error);
-  return reply.status(status).send({
-    code: error.code,
-    message: error.message,
-  });
-};
-
 export const registerReservationRoutes = (
   app: FastifyInstance,
   service: ReservationService,
 ) => {
   // Palauttaa huoneen kaikki varaukset.
-  app.get(
-    "/rooms/:roomId/reservations",
-    async (
-      request: FastifyRequest<{ Params: RoomIdParams }>,
-      reply: FastifyReply,
-    ) => {
-      const parseResult = roomIdParamsSchema.safeParse(request.params);
-      if (!parseResult.success) {
-        return reply.status(400).send({
-          message: "Invalid params",
-          issues: parseResult.error.issues,
-        });
-      }
+  app.get("/rooms/:roomId/reservations", async (request: FastifyRequest<{ Params: RoomIdParams }>) => {
+    const { roomId } = roomIdParamsSchema.parse(request.params);
 
-      const { roomId } = parseResult.data;
+    const result = await service.listReservationsForRoom({ roomId });
 
-      const result = await service.listReservationsForRoom({
-        roomId,
-      });
+    if (!result.ok) {
+      const status = mapReservationErrorToStatus(result.error);
+      throw { statusCode: status, ...result.error };
+    }
 
-      if (!result.ok) {
-        return sendReservationError(reply, result.error);
-      }
-
-      const dtos = result.value.map(toReservationDto);
-      return reply.status(200).send(dtos);
-    },
-  );
+    return result.value.map(toReservationDto);
+  });
 
   // Palauttaa kaikki varaukset huoneesta riippumatta. (debug / admin -henkinen reitti)
   app.get("/reservations", async (_request, reply) => {
     const reservations = await service.listAllReservations();
-    const dtos = reservations.map(toReservationDto);
-    return reply.status(200).send(dtos);
+    return reservations.map(toReservationDto);
   });
 
   // Luo uuden varauksen.
-  app.post(
-    "/rooms/:roomId/reservations",
-    async (
+  app.post("/rooms/:roomId/reservations", async (
       request: FastifyRequest<{
         Params: RoomIdParams;
         Body: CreateReservationBody;
       }>,
-      reply: FastifyReply,
     ) => {
       // Params-validointi
-      const paramsParse = roomIdParamsSchema.safeParse(
-        request.params,
-      );
-      if (!paramsParse.success) {
-        return reply.status(400).send({
-          message: "Invalid params",
-          issues: paramsParse.error.issues,
-        });
-      }
-
-      // Body-validointi
-      const bodyParse = createReservationBodySchema.safeParse(
-        request.body,
-      );
-      if (!bodyParse.success) {
-        return reply.status(400).send({
-          message: "Invalid body",
-          issues: bodyParse.error.issues,
-        });
-      }
-
-      const { roomId } = paramsParse.data;
-      const { start, durationMinutes, title, host } =
-        bodyParse.data;
-
+      const { roomId } = roomIdParamsSchema.parse(request.params);
+      const { start, durationMinutes, title, host } = createReservationBodySchema.parse(request.body);
+      
       const startDate = parseIsoDateTime(start);
+
       if (!startDate) {
-        return reply.status(400).send({
+        throw {
+          statusCode: 400,
+          code: "INVALID_DATETIME",
           message: "Invalid start datetime format",
-        });
+        };
       }
 
       const result = await service.createReservation({
@@ -162,7 +106,8 @@ export const registerReservationRoutes = (
       });
 
       if (!result.ok) {
-        return sendReservationError(reply, result.error);
+        const status = mapReservationErrorToStatus(result.error);
+        throw { statusCode: status, ...result.error };
       }
 
       const dto = toReservationDto(result.value);
@@ -173,47 +118,31 @@ export const registerReservationRoutes = (
         "Reservation created",
       );
 
-      return reply.status(201).send(dto);
-    },
+      return dto;
+    }
   );
 
   // Poistaa varauksen id:n perusteella.
   // Huom: roomId on mukana URL:ssa REST-tyylisesti, mutta
   // poistologikka perustuu reservationId:hen.
-  app.delete(
-    "/rooms/:roomId/reservations/:reservationId",
-    async (
+  app.delete("/rooms/:roomId/reservations/:reservationId", async (
       request: FastifyRequest<{
         Params: DeleteReservationParams;
-      }>,
-      reply: FastifyReply,
+      }>
     ) => {
-      const paramsParse =
-        deleteReservationParamsSchema.safeParse(request.params);
-      if (!paramsParse.success) {
-        return reply.status(400).send({
-          message: "Invalid params",
-          issues: paramsParse.error.issues,
-        });
-      }
+      const { reservationId } = deleteReservationParamsSchema.parse(request.params);
 
-      const { reservationId } = paramsParse.data;
-
-      const result = await service.deleteReservation({
-        reservationId,
-      });
+      const result = await service.deleteReservation({ reservationId });
 
       if (!result.ok) {
-        return sendReservationError(reply, result.error);
+        const status = mapReservationErrorToStatus(result.error);
+        throw { statusCode: status, ...result.error };
       }
 
       // Logita onnistunut poisto
-      request.log.info(
-        { reservationId },
-        "Reservation deleted",
-      );
+      request.log.info({ reservationId }, "Reservation deleted");
 
-      return reply.status(204).send();
+      return { success: true };
     },
   );
 };
