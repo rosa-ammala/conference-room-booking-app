@@ -25,8 +25,14 @@ export const createReservationBodySchema = z.object({
         )}]`,
       },
     ),
-  title: z.string().min(1, "title is required"),
-  host: z.string().min(1, "host is required"),
+  title: z.string()
+    .min(1, "title is required")
+    .max(100, "title too long")
+    .trim(),
+  host: z.string()
+    .min(1, "host is required")
+    .max(100, "title too long")
+    .trim(),
 });
 
 export type RoomIdParams = z.infer<typeof roomIdParamsSchema>;
