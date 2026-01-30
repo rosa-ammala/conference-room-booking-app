@@ -7,7 +7,7 @@ import {
   ReservationId,
   RoomId,
 } from '../models/reservation.model';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../../environments/environment.prod';
 import { Room } from '../models/room.model';
 
 @Injectable({
