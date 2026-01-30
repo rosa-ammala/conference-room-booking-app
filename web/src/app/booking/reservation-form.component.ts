@@ -11,6 +11,7 @@ import {
 } from '../core/utils/slot.util';
 import { environment } from '../../environments/environment';
 import { ReservationsApiService } from '../core/services/reservations-api.service';
+import { BOOKING_CONFIG } from '../config/booking.config';
 
 @Component({
   selector: 'app-reservation-form',
@@ -20,9 +21,9 @@ import { ReservationsApiService } from '../core/services/reservations-api.servic
   styleUrls: ['./reservation-form.component.scss'],
 })
 export class ReservationFormComponent implements OnInit, OnDestroy {
-  readonly durations: ReservationDurationMinutes[] = [30, 60, 120, 180];
+  readonly durations: ReservationDurationMinutes[] = [];
 
-  selectedDuration: ReservationDurationMinutes = 60;
+  selectedDuration: ReservationDurationMinutes = BOOKING_CONFIG.DEFAULT_DURATION_MINUTES;
   timeSlots: SlotInfo[] = [];
   selectedStartIsoUtc: string | null = null;
 
@@ -60,8 +61,8 @@ export class ReservationFormComponent implements OnInit, OnDestroy {
       this.timeSlots = computeDaySlots({
         dateKey,
         durationMinutes: duration,
-        workdayStartHour: environment.workdayStartHour,
-        workdayEndHour: environment.workdayEndHour,
+        workdayStartHour: BOOKING_CONFIG.WORKDAY_START_HOUR,
+        workdayEndHour: BOOKING_CONFIG.WORKDAY_END_HOUR,
         reservations: reservationsForDay,
       });
     });

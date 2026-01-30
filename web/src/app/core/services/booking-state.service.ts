@@ -11,6 +11,7 @@ import {
   ReservationId,
 } from '../models/reservation.model';
 import { todayDateKeyUtc } from '../utils/date-time.util';
+import { BOOKING_CONFIG } from '../../config/booking.config';
 
 @Injectable({
   providedIn: 'root',
@@ -19,7 +20,7 @@ export class BookingStateService {
   private readonly initialState: BookingState = {
     selectedRoomId: null,
     selectedDateKey: todayDateKeyUtc(),
-    selectedDurationMinutes: 60,
+    selectedDurationMinutes: BOOKING_CONFIG.DEFAULT_DURATION_MINUTES,
     selectedStartIsoUtc: null,
     reservationsByRoomId: {},
   };
